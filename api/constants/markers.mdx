@@ -1,0 +1,204 @@
+---
+title: Markers
+description: Enum of supported segment marker types
+---
+
+## Enum
+
+```typescript
+enum Markers {
+  Book = 'B',
+  Footnote = 'F',
+  Heading = 'T',
+  Chapter = 'C',
+  Note = 'N',
+  Plain = 'P'
+}
+```
+
+## Values
+
+<ResponseField name="Book" type="'B'">
+  Book reference marker. Used for book-level segments.
+  
+  Example: `B123`, `B45a`
+</ResponseField>
+
+<ResponseField name="Footnote" type="'F'">
+  Footnote reference marker. Used for footnote text.
+  
+  Example: `F789`, `F12b`
+</ResponseField>
+
+<ResponseField name="Heading" type="'T'">
+  Heading/title reference marker. Used for section headings.
+  
+  Example: `T456`, `T89a`
+</ResponseField>
+
+<ResponseField name="Chapter" type="'C'">
+  Chapter reference marker. Used for chapter-level segments.
+  
+  Example: `C234`, `C67c`
+</ResponseField>
+
+<ResponseField name="Note" type="'N'">
+  Note reference marker. Used for editorial notes.
+  
+  Example: `N890`, `N34d`
+</ResponseField>
+
+<ResponseField name="Plain" type="'P'">
+  Plain segment marker. Used for general paragraph/segment text. Most common type.
+  
+  Example: `P1234`, `P567a`
+</ResponseField>
+
+## Usage
+
+### Access marker values
+
+```typescript
+import { Markers } from 'wobble-bibble';
+
+console.log(Markers.Plain);     // 'P'
+console.log(Markers.Book);      // 'B'
+console.log(Markers.Footnote);  // 'F'
+console.log(Markers.Heading);   // 'T'
+console.log(Markers.Chapter);   // 'C'
+console.log(Markers.Note);      // 'N'
+```
+
+### Type-safe marker handling
+
+```typescript
+import { Markers } from 'wobble-bibble';
+
+function getMarkerType(id: string): Markers | null {
+  const prefix = id.charAt(0) as Markers;
+  return Object.values(Markers).includes(prefix) ? prefix : null;
+}
+
+const type = getMarkerType('P1234');
+if (type === Markers.Plain) {
+  console.log('This is a plain segment');
+}
+```
+
+### Build segment IDs
+
+```typescript
+import { Markers } from 'wobble-bibble';
+
+function createSegmentId(type: Markers, number: number, suffix?: string): string {
+  return `${type}${number}${suffix || ''}`;
+}
+
+const plainId = createSegmentId(Markers.Plain, 1234);      // 'P1234'
+const bookId = createSegmentId(Markers.Book, 45, 'a');     // 'B45a'
+const footnoteId = createSegmentId(Markers.Footnote, 789); // 'F789'
+```
+
+### Filter segments by type
+
+```typescript
+import { Markers, type Segment } from 'wobble-bibble';
+
+function filterByMarkerType(segments: Segment[], markerType: Markers): Segment[] {
+  return segments.filter(seg => seg.id.startsWith(markerType));
+}
+
+const segments: Segment[] = [
+  { id: 'P1234', text: 'نص عربي' },
+  { id: 'B45', text: 'كتاب' },
+  { id: 'P1235', text: 'نص آخر' }
+];
+
+const plainSegments = filterByMarkerType(segments, Markers.Plain);
+console.log(plainSegments.length);  // 2
+```
+
+### Iterate all marker types
+
+```typescript
+import { Markers } from 'wobble-bibble';
+
+for (const [name, value] of Object.entries(Markers)) {
+  console.log(`${name}: ${value}`);
+}
+// Output:
+// Book: B
+// Footnote: F
+// Heading: T
+// Chapter: C
+// Note: N
+// Plain: P
+```
+
+### Group segments by marker type
+
+```typescript
+import { Markers, type Segment } from 'wobble-bibble';
+
+function groupByMarkerType(segments: Segment[]): Map<Markers, Segment[]> {
+  const groups = new Map<Markers, Segment[]>();
+  
+  for (const segment of segments) {
+    const type = segment.id.charAt(0) as Markers;
+    if (!groups.has(type)) {
+      groups.set(type, []);
+    }
+    groups.get(type)!.push(segment);
+  }
+  
+  return groups;
+}
+
+const segments: Segment[] = [
+  { id: 'P1234', text: 'نص' },
+  { id: 'B45', text: 'كتاب' },
+  { id: 'P1235', text: 'نص آخر' },
+  { id: 'F12', text: 'حاشية' }
+];
+
+const grouped = groupByMarkerType(segments);
+console.log(grouped.get(Markers.Plain)?.length);    // 2
+console.log(grouped.get(Markers.Book)?.length);     // 1
+console.log(grouped.get(Markers.Footnote)?.length); // 1
+```
+
+## Common marker types
+
+### By frequency
+
+| Marker | Frequency | Use Case |
+|--------|-----------|----------|
+| `P` (Plain) | Very High | Most paragraph text |
+| `B` (Book) | Medium | Book references, citations |
+| `F` (Footnote) | Medium | Footnotes, commentaries |
+| `T` (Heading) | Low | Section titles |
+| `C` (Chapter) | Low | Chapter boundaries |
+| `N` (Note) | Low | Editorial notes |
+
+## Internal usage
+
+The `Markers` enum is used internally to build:
+- `TRANSLATION_MARKER_PARTS.markers` - Regex character class
+- `MARKER_ID_PATTERN` - Full ID pattern
+
+```typescript
+// From constants.ts
+const TRANSLATION_MARKER_PARTS = {
+  markers: `[${Object.values(Markers).join('')}]`,  // [BFTNCP]
+  // ...
+};
+```
+
+## Related constants
+
+- [MARKER_ID_PATTERN](/api/constants/marker-id-pattern) - Uses these marker values
+- [TRANSLATION_MARKER_PARTS](/api/constants/translation-marker-parts) - Pattern components
+
+## Related types
+
+- [Segment](/api/types/segment) - Contains ID with marker prefix

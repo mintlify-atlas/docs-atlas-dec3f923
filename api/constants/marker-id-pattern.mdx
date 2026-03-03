@@ -1,0 +1,144 @@
+---
+title: MARKER_ID_PATTERN
+description: Regular expression pattern for matching segment IDs
+---
+
+## Constant
+
+```typescript
+const MARKER_ID_PATTERN: string;
+```
+
+## Value
+
+```typescript
+// Pattern matches: [BFTNCP]\d+[a-z]?
+// Examples: P1234, B45a, H890, F123b
+```
+
+## Description
+
+A regular expression pattern string that matches valid segment IDs used in Islamic text translations.
+
+The pattern is constructed from `TRANSLATION_MARKER_PARTS` and matches:
+- A single letter prefix (marker type)
+- One or more digits
+- An optional lowercase letter suffix
+
+## Valid marker prefixes
+
+| Prefix | Type | Example |
+|--------|------|----------|
+| `B` | Book | `B123` |
+| `F` | Footnote | `F45a` |
+| `T` | Heading | `T890` |
+| `C` | Chapter | `C567` |
+| `N` | Note | `N234b` |
+| `P` | Plain segment | `P1234` |
+
+## Usage
+
+### Validate segment ID format
+
+```typescript
+import { MARKER_ID_PATTERN } from 'wobble-bibble';
+
+const pattern = new RegExp(`^${MARKER_ID_PATTERN}$`);
+
+pattern.test('P1234');   // true
+pattern.test('B45a');    // true
+pattern.test('H890');    // true
+pattern.test('123');     // false (no prefix)
+pattern.test('X123');    // false (invalid prefix)
+pattern.test('P123A');   // false (uppercase suffix)
+```
+
+### Extract IDs from text
+
+```typescript
+import { MARKER_ID_PATTERN } from 'wobble-bibble';
+
+const text = 'P1234 - Translation here\nB45a - Another translation';
+const pattern = new RegExp(MARKER_ID_PATTERN, 'g');
+const ids = [...text.matchAll(pattern)].map(m => m[0]);
+
+console.log(ids);  // ['P1234', 'B45a']
+```
+
+### Build marker pattern
+
+```typescript
+import { MARKER_ID_PATTERN, TRANSLATION_MARKER_PARTS } from 'wobble-bibble';
+
+const { dashes, optionalSpace } = TRANSLATION_MARKER_PARTS;
+
+// Match "ID - Text" format
+const markerPattern = new RegExp(
+  `^(${MARKER_ID_PATTERN})${optionalSpace}${dashes}\\s*`,
+  'gm'
+);
+
+const text = 'P1234 - Translation text';
+const match = text.match(markerPattern);
+console.log(match);  // ['P1234 - ']
+```
+
+## Pattern construction
+
+The pattern is built from `TRANSLATION_MARKER_PARTS`:
+
+```typescript
+// From constants.ts
+const MARKER_ID_PATTERN = 
+  `${TRANSLATION_MARKER_PARTS.markers}` +      // [BFTNCP]
+  `${TRANSLATION_MARKER_PARTS.digits}` +       // \d+
+  `${TRANSLATION_MARKER_PARTS.suffix}?`;       // [a-z]?
+```
+
+## Use cases
+
+### Internal validation
+
+The library uses this pattern internally in:
+- `validateTranslationResponse()` - Validate marker format
+- `extractTranslationIds()` - Extract IDs from text
+- `parseTranslations()` - Parse ID-translation pairs
+
+### Custom validation
+
+```typescript
+import { MARKER_ID_PATTERN } from 'wobble-bibble';
+
+function validateSegmentId(id: string): boolean {
+  const pattern = new RegExp(`^${MARKER_ID_PATTERN}$`);
+  return pattern.test(id);
+}
+
+console.log(validateSegmentId('P1234'));   // true
+console.log(validateSegmentId('INVALID')); // false
+```
+
+### Custom parsing
+
+```typescript
+import { MARKER_ID_PATTERN } from 'wobble-bibble';
+
+function extractMarkerType(id: string): string | null {
+  const pattern = new RegExp(`^([BFTNCP])`);
+  const match = id.match(pattern);
+  return match ? match[1] : null;
+}
+
+console.log(extractMarkerType('P1234'));  // 'P'
+console.log(extractMarkerType('B45a'));   // 'B'
+```
+
+## Related constants
+
+- [TRANSLATION_MARKER_PARTS](/api/constants/translation-marker-parts) - Pattern components
+- [Markers](/api/constants/markers) - Marker type enum
+
+## Related functions
+
+- [extractTranslationIds](/api/text-utils/extract-translation-ids) - Uses this pattern
+- [validateTranslationResponse](/api/validation/validate-translation-response) - Validates IDs

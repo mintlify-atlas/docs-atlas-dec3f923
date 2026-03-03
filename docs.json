@@ -104,6 +104,14 @@
             ]
           },
           {
+            "group": "Constants",
+            "pages": [
+              "api/constants/marker-id-pattern",
+              "api/constants/markers",
+              "api/constants/translation-marker-parts"
+            ]
+          },
+          {
             "group": "Types",
             "pages": [
               "api/types/segment",

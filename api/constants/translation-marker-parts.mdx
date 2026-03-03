@@ -1,0 +1,241 @@
+---
+title: TRANSLATION_MARKER_PARTS
+description: Regex components for building translation marker patterns
+---
+
+## Constant
+
+```typescript
+const TRANSLATION_MARKER_PARTS: {
+  dashes: string;
+  digits: string;
+  markers: string;
+  optionalSpace: string;
+  suffix: string;
+};
+```
+
+## Properties
+
+<ResponseField name="dashes" type="string">
+  Regex pattern for dash variations.
+  
+  Value: `'[-–—]'`
+  
+  Matches:
+  - Hyphen: `-` (U+002D)
+  - En dash: `–` (U+2013)
+  - Em dash: `—` (U+2014)
+</ResponseField>
+
+<ResponseField name="digits" type="string">
+  Regex pattern for numeric portion.
+  
+  Value: `'\\d+'`
+  
+  Matches one or more digits (0-9).
+</ResponseField>
+
+<ResponseField name="markers" type="string">
+  Regex character class for valid marker prefixes.
+  
+  Value: `'[BFTNCP]'`
+  
+  Matches any of: B, F, T, N, C, P
+</ResponseField>
+
+<ResponseField name="optionalSpace" type="string">
+  Regex pattern for optional whitespace before dash.
+  
+  Value: `'\\s?'`
+  
+  Matches zero or one whitespace character.
+</ResponseField>
+
+<ResponseField name="suffix" type="string">
+  Regex pattern for valid single-letter suffixes.
+  
+  Value: `'[a-z]'`
+  
+  Matches any lowercase letter (a-z).
+</ResponseField>
+
+## Usage
+
+### Build marker pattern
+
+```typescript
+import { TRANSLATION_MARKER_PARTS } from 'wobble-bibble';
+
+const { markers, digits, suffix } = TRANSLATION_MARKER_PARTS;
+
+// Match segment ID
+const idPattern = new RegExp(`^${markers}${digits}${suffix}?$`);
+
+idPattern.test('P1234');   // true
+idPattern.test('B45a');    // true
+idPattern.test('123');     // false
+```
+
+### Match "ID - Text" format
+
+```typescript
+import { TRANSLATION_MARKER_PARTS, MARKER_ID_PATTERN } from 'wobble-bibble';
+
+const { dashes, optionalSpace } = TRANSLATION_MARKER_PARTS;
+
+// Match complete marker line
+const markerPattern = new RegExp(
+  `^(${MARKER_ID_PATTERN})${optionalSpace}${dashes}\\s*(.*)$`,
+  'gm'
+);
+
+const text = `
+P1234 - Translation text here
+B45a–Another translation
+F890 — Footnote text
+`;
+
+for (const match of text.matchAll(markerPattern)) {
+  console.log(`ID: ${match[1]}, Text: ${match[2]}`);
+}
+// Output:
+// ID: P1234, Text: Translation text here
+// ID: B45a, Text: Another translation
+// ID: F890, Text: Footnote text
+```
+
+### Handle dash variations
+
+```typescript
+import { TRANSLATION_MARKER_PARTS } from 'wobble-bibble';
+
+const { dashes } = TRANSLATION_MARKER_PARTS;
+const dashPattern = new RegExp(dashes);
+
+// All these match:
+dashPattern.test('P1234 - text');   // true (hyphen)
+dashPattern.test('P1234 – text');   // true (en dash)
+dashPattern.test('P1234 — text');   // true (em dash)
+```
+
+### Validate marker spacing
+
+```typescript
+import { TRANSLATION_MARKER_PARTS, MARKER_ID_PATTERN } from 'wobble-bibble';
+
+const { optionalSpace, dashes } = TRANSLATION_MARKER_PARTS;
+
+// Match with or without space before dash
+const pattern = new RegExp(`^${MARKER_ID_PATTERN}${optionalSpace}${dashes}`);
+
+pattern.test('P1234 -');   // true (with space)
+pattern.test('P1234-');    // true (no space)
+pattern.test('P1234  -');  // false (two spaces)
+```
+
+### Extract ID components
+
+```typescript
+import { TRANSLATION_MARKER_PARTS } from 'wobble-bibble';
+
+const { markers, digits, suffix } = TRANSLATION_MARKER_PARTS;
+
+// Capture ID parts separately
+const componentPattern = new RegExp(
+  `^(${markers})(${digits})(${suffix})?$`
+);
+
+const match1 = 'P1234'.match(componentPattern);
+if (match1) {
+  console.log('Marker:', match1[1]);  // 'P'
+  console.log('Number:', match1[2]);  // '1234'
+  console.log('Suffix:', match1[3]);  // undefined
+}
+
+const match2 = 'B45a'.match(componentPattern);
+if (match2) {
+  console.log('Marker:', match2[1]);  // 'B'
+  console.log('Number:', match2[2]);  // '45'
+  console.log('Suffix:', match2[3]);  // 'a'
+}
+```
+
+## Internal construction
+
+From `constants.ts`:
+
+```typescript
+import { Markers } from './constants';
+
+export const TRANSLATION_MARKER_PARTS = {
+  dashes: '[-–—]',
+  digits: '\\d+',
+  markers: `[${Object.values(Markers).join('')}]`,  // [BFTNCP]
+  optionalSpace: '\\s?',
+  suffix: '[a-z]'
+} as const;
+```
+
+## Pattern combinations
+
+### Strict marker line
+
+```typescript
+import { TRANSLATION_MARKER_PARTS, MARKER_ID_PATTERN } from 'wobble-bibble';
+
+const { optionalSpace, dashes } = TRANSLATION_MARKER_PARTS;
+
+// Require non-empty text after dash
+const strictPattern = new RegExp(
+  `^${MARKER_ID_PATTERN}${optionalSpace}${dashes}\\s*\\S+`
+);
+
+strictPattern.test('P1234 - text');   // true
+strictPattern.test('P1234 - ');       // false (no text)
+strictPattern.test('P1234 -');        // false (no text)
+```
+
+### Lenient marker line
+
+```typescript
+import { TRANSLATION_MARKER_PARTS, MARKER_ID_PATTERN } from 'wobble-bibble';
+
+const { optionalSpace, dashes } = TRANSLATION_MARKER_PARTS;
+
+// Allow empty text after dash
+const lenientPattern = new RegExp(
+  `^${MARKER_ID_PATTERN}${optionalSpace}${dashes}`
+);
+
+lenientPattern.test('P1234 - text');  // true
+lenientPattern.test('P1234 - ');      // true
+lenientPattern.test('P1234 -');       // true
+```
+
+## Use in validation
+
+The library uses these parts in:
+
+```typescript
+// From validation.ts
+const headerPattern = new RegExp(
+  `^(${MARKER_ID_PATTERN})${optionalSpace}${dashes}\\s*`,
+  'gm'
+);
+
+// Matches:
+// P1234 - text
+// B45a-text
+// F890 – text
+```
+
+## Related constants
+
+- [MARKER_ID_PATTERN](/api/constants/marker-id-pattern) - Built from these parts
+- [Markers](/api/constants/markers) - Provides marker prefix values
+
+## Related functions
+
+- [validateTranslationResponse](/api/validation/validate-translation-response) - Uses these patterns
+- [extractTranslationIds](/api/text-utils/extract-translation-ids) - Uses these patterns
