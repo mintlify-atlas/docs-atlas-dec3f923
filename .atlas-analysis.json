@@ -1,0 +1,137 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "Wobble Bibble",
+  "projectDescription": "TypeScript library for Islamic text translation prompts with LLM output validation and prompt stacking utilities.",
+  "theme": "palm",
+  "primaryColor": "#2E7D32",
+  "lightColor": "#66BB6A",
+  "darkColor": "#1B5E20",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/prompts",
+              "concepts/validation",
+              "concepts/stacking"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/using-prompts",
+              "guides/validating-output",
+              "guides/fixing-errors",
+              "guides/custom-prompts"
+            ]
+          },
+          {
+            "group": "Prompt Templates",
+            "pages": [
+              "prompts/overview",
+              "prompts/master-prompt",
+              "prompts/hadith",
+              "prompts/fiqh",
+              "prompts/tafsir",
+              "prompts/fatawa",
+              "prompts/encyclopedia-mixed",
+              "prompts/jarh-wa-tadil",
+              "prompts/usul-al-fiqh"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Prompts",
+            "pages": [
+              "api/prompts/get-prompt",
+              "api/prompts/get-prompts",
+              "api/prompts/get-stacked-prompt",
+              "api/prompts/get-master-prompt",
+              "api/prompts/get-prompt-ids",
+              "api/prompts/stack-prompts"
+            ]
+          },
+          {
+            "group": "Validation",
+            "pages": [
+              "api/validation/validate-translation-response",
+              "api/validation/validation-error-type-info"
+            ]
+          },
+          {
+            "group": "Text Utils",
+            "pages": [
+              "api/text-utils/format-excerpts-for-prompt",
+              "api/text-utils/normalize-translation-text",
+              "api/text-utils/normalize-translation-text-with-map",
+              "api/text-utils/extract-translation-ids",
+              "api/text-utils/parse-translations",
+              "api/text-utils/parse-translations-in-order"
+            ]
+          },
+          {
+            "group": "Fixers",
+            "pages": [
+              "api/fixers/fix-all",
+              "api/fixers/fix-collapsed-speaker-lines"
+            ]
+          },
+          {
+            "group": "Types",
+            "pages": [
+              "api/types/segment",
+              "api/types/validation-error",
+              "api/types/validation-config",
+              "api/types/stacked-prompt",
+              "api/types/fix-config",
+              "api/types/fix-result"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "8 optimized Islamic translation prompts (Hadith, Fiqh, Tafsir, etc.) with strongly-typed access",
+    "Comprehensive LLM output validation catching hallucinations, formatting errors, and Arabic script leaks",
+    "Automatic prompt stacking combining master prompts with specialized addons",
+    "Precise error ranges with start/end indices for highlighting translation issues",
+    "Automated fixers for common LLM formatting mistakes like collapsed speaker labels",
+    "Gold standard reference dataset for benchmarking translation quality",
+    "ALA-LC transliteration standard support with diacritic handling",
+    "Zero dependencies runtime with TypeScript types included"
+  ],
+  "publicApiSurface": [
+    "getPrompt(id: PromptId): StackedPrompt",
+    "getPrompts(): StackedPrompt[]",
+    "getStackedPrompt(id: PromptId): string",
+    "getMasterPrompt(): string",
+    "getPromptIds(): PromptId[]",
+    "stackPrompts(master: string, addon: string): string",
+    "validateTranslationResponse(segments: Segment[], response: string, options?: ValidationOptions): ValidationResponseResult",
+    "formatExcerptsForPrompt(segments: Segment[], prompt: string): string",
+    "normalizeTranslationText(text: string): string",
+    "normalizeTranslationTextWithMap(text: string): { normalized: string; indexMap: number[] }",
+    "extractTranslationIds(text: string): string[]",
+    "parseTranslations(response: string): Map<string, string>",
+    "parseTranslationsInOrder(response: string): Array<{ id: string; text: string }>",
+    "fixCollapsedSpeakerLines(text: string, config?: FixConfig): FixResult",
+    "fixAll(text: string, options: FixAllOptions): FixResult",
+    "VALIDATION_ERROR_TYPE_INFO: Record<ValidationErrorType, { description: string }>"
+  ]
+}
