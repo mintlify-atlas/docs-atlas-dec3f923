@@ -1,0 +1,119 @@
+---
+title: normalizeTranslationTextWithMap
+description: Normalize translation text while preserving original character position mappings
+---
+
+## Overview
+
+Performs the same normalization as `normalizeTranslationText`, but also returns an index map that tracks how each character in the normalized text corresponds to positions in the original input. This is useful for error reporting and debugging.
+
+## Function Signature
+
+```typescript
+normalizeTranslationTextWithMap(content: string): {
+  normalized: string;
+  indexMap: number[];
+}
+```
+
+## Parameters
+
+<ParamField path="content" type="string" required>
+  Raw translation text that may contain inconsistent line endings or merged markers.
+</ParamField>
+
+## Returns
+
+<ResponseField name="normalized" type="string">
+  The normalized text with standardized line endings and properly separated markers.
+</ResponseField>
+
+<ResponseField name="indexMap" type="number[]">
+  Array where each index represents a character position in the normalized string, and the value at that index is the corresponding character position in the original input string.
+</ResponseField>
+
+## Usage
+
+### Basic Example
+
+```typescript
+import { normalizeTranslationTextWithMap } from 'wobble-bibble';
+
+const original = 'P1 - Hello\r\nP2 - World';
+const result = normalizeTranslationTextWithMap(original);
+
+console.log(result.normalized);
+// P1 - Hello
+// P2 - World
+
+console.log(result.indexMap.length === result.normalized.length); // true
+```
+
+### Tracking Character Positions
+
+```typescript
+const original = 'helloP1 - text';
+const { normalized, indexMap } = normalizeTranslationTextWithMap(original);
+
+// normalized = 'hello\nP1 - text'
+// The newline was inserted at position 5
+
+// Find where 'P' in the normalized text came from in the original
+const normalizedPPosition = normalized.indexOf('P');
+const originalPPosition = indexMap[normalizedPPosition];
+
+console.log(originalPPosition); // 5 (same position in original)
+```
+
+### Error Reporting with Position Mapping
+
+```typescript
+function reportError(normalized: string, indexMap: number[], errorPos: number) {
+  const originalPos = indexMap[errorPos];
+  return `Error at position ${originalPos} in original text (position ${errorPos} in normalized)`;
+}
+
+const { normalized, indexMap } = normalizeTranslationTextWithMap('bad\r\ninput');
+const error = reportError(normalized, indexMap, 5);
+console.log(error);
+```
+
+## What It Does
+
+The function performs the same normalization steps as `normalizeTranslationText`:
+
+1. **Line Ending Normalization**: Converts \r\n and \r to \n
+2. **Merged Marker Splitting**: Inserts newlines before markers merged with text
+
+3. **Escaped Bracket Handling**: Removes backslash escaping from `\[`
+
+**Additionally**, it builds an index map that allows you to trace any character in the normalized output back to its original position in the input.
+
+## Understanding the Index Map
+
+The `indexMap` array has the same length as the normalized string. For any position `i` in the normalized string:
+
+```typescript
+const originalPosition = indexMap[i];
+```
+
+This tells you which character position in the original string corresponds to position `i` in the normalized string.
+
+**Important**: When characters are inserted during normalization (like newlines), multiple positions in the normalized string may map to the same original position.
+
+## When to Use
+
+Use `normalizeTranslationTextWithMap` when:
+
+- You need to report errors with accurate original text positions
+- Building developer tools or debuggers for translation processing
+- Implementing syntax highlighting or error underlining in editors
+- Debugging normalization issues by tracking character transformations
+
+For most cases where you only need the normalized output, use the simpler `normalizeTranslationText` function instead.
+
+## Related Functions
+
+- [`normalizeTranslationText`](/api/text-utils/normalize-translation-text) - Simpler version without position mapping
+- [`extractTranslationIds`](/api/text-utils/extract-translation-ids) - Extract IDs from normalized text
+- [`parseTranslations`](/api/text-utils/parse-translations) - Parse normalized text into translations

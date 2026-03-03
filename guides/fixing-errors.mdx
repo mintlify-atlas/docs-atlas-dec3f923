@@ -1,0 +1,448 @@
+---
+title: Fixing Errors
+description: Automatically repair common LLM formatting errors with wobble-bibble's fixer utilities
+---
+
+Wobble-bibble provides automated fixers to repair common LLM formatting mistakes. Instead of manually correcting errors, you can apply fixers to clean up the output.
+
+## Available Fixers
+
+Currently, wobble-bibble supports one primary fixer:
+
+- **`fixCollapsedSpeakerLines`** - Fixes speaker labels that appear mid-line instead of starting on a new line
+
+<Info>
+  More fixers will be added in future releases. The fixer system is designed to be extensible.
+</Info>
+
+## Fixing Collapsed Speaker Lines
+
+In Q&A format translations (like Fatawa), LLMs sometimes collapse multiple speaker turns onto a single line:
+
+```typescript
+import { fixCollapsedSpeakerLines } from 'wobble-bibble';
+
+// ❌ Bad: "Questioner:" appears mid-line
+const badOutput = `P1 - Questioner: Hi. The Shaykh: Hello.`;
+
+// Fix it
+const result = fixCollapsedSpeakerLines(badOutput, {
+  speakerLabels: ['Questioner', 'The Shaykh']
+});
+
+console.log(result.text);
+// ✅ Good:
+// P1 - Questioner: Hi.
+// The Shaykh: Hello.
+
+console.log(result.counts.fixCollapsedSpeakerLines); // 1
+```
+
+### How It Works
+
+<Steps>
+  <Step title="Detect Line-Start Labels">
+    The fixer identifies speaker labels that appear at the start of lines (e.g., "Questioner:", "The Shaykh:").
+  </Step>
+  
+  <Step title="Find Mid-Line Occurrences">
+    It searches for the same labels appearing in the middle of lines.
+  </Step>
+  
+  <Step title="Insert Newlines">
+    Before each mid-line label, it inserts a newline while preserving trailing punctuation.
+  </Step>
+  
+  <Step title="Return Results">
+    Returns the fixed text along with counts of how many fixes were applied.
+  </Step>
+</Steps>
+
+## Automatic Label Inference
+
+You don't need to provide speaker labels manually. The fixer can infer them from the text:
+
+```typescript
+import { fixCollapsedSpeakerLines } from 'wobble-bibble';
+
+const input = `P256151 - Questioner: Okay. The Shaykh: No. Questioner: Not valid? The Shaykh: Yes.`;
+
+// No config needed - labels are inferred
+const result = fixCollapsedSpeakerLines(input);
+
+console.log(result.text);
+// P256151 - Questioner: Okay.
+// The Shaykh: No.
+// Questioner: Not valid?
+// The Shaykh: Yes.
+
+console.log(result.counts.fixCollapsedSpeakerLines); // 3
+```
+
+<Info>
+  Label inference only considers labels that appear **2 or more times** in the text. Single occurrences are ignored to avoid false positives.
+</Info>
+
+## Custom Speaker Labels
+
+For specialized cases, provide explicit speaker labels:
+
+```typescript
+import { fixCollapsedSpeakerLines } from 'wobble-bibble';
+
+const input = `P1 - Mu'adhdhin: Allahu akbar. The Shaykh: Allahu akbar.`;
+
+const result = fixCollapsedSpeakerLines(input, {
+  speakerLabels: ["Mu'adhdhin", 'The Shaykh']
+});
+
+console.log(result.text);
+// P1 - Mu'adhdhin: Allahu akbar.
+// The Shaykh: Allahu akbar.
+```
+
+## Handling Punctuation
+
+The fixer intelligently preserves punctuation before speaker labels:
+
+```typescript
+const input = `P1 - Something؟ The Shaykh: Reply.`;
+
+const result = fixCollapsedSpeakerLines(input, {
+  speakerLabels: ['The Shaykh']
+});
+
+console.log(result.text);
+// P1 - Something؟
+// The Shaykh: Reply.
+```
+
+### Custom Punctuation Patterns
+
+You can specify which punctuation marks should be handled:
+
+```typescript
+const result = fixCollapsedSpeakerLines(input, {
+  speakerLabels: ['The Shaykh'],
+  leadingPunctuation: ['.', '?', '!', '؟', '۔']
+});
+```
+
+## Fix Result Structure
+
+Every fixer returns a `FixResult` object:
+
+```typescript
+interface FixResult {
+  // The fixed text
+  text: string;
+  
+  // Names of fixers that were applied (empty if no changes)
+  applied: string[];
+  
+  // Fixers that were requested (only in fixAll)
+  requested?: string[];
+  
+  // Fixers that were skipped (only in fixAll)
+  skipped?: string[];
+  
+  // Per-fixer counts of how many fixes were made
+  counts: Record<string, number>;
+}
+```
+
+Example:
+
+```typescript
+const result = fixCollapsedSpeakerLines(input, { speakerLabels });
+
+if (result.applied.length > 0) {
+  console.log(`Applied fixers: ${result.applied.join(', ')}`);
+  console.log(`Total fixes: ${result.counts.fixCollapsedSpeakerLines}`);
+} else {
+  console.log('No fixes needed');
+}
+```
+
+## Using `fixAll` for Multiple Error Types
+
+The `fixAll()` function applies multiple fixers based on `ValidationErrorType`s:
+
+```typescript
+import { fixAll, validateTranslationResponse } from 'wobble-bibble';
+
+const segments = [{
+  id: 'P1',
+  text: 'السائل: نعم\nالشيخ: نعم'
+}];
+
+const llmOutput = `P1 - Questioner: Yes. The Shaykh: Yes. Questioner: No.`;
+
+// Validate first
+const validation = validateTranslationResponse(segments, llmOutput);
+
+if (validation.errors.length > 0) {
+  // Extract error types to fix
+  const errorTypes = [...new Set(validation.errors.map(e => e.type))];
+  
+  // Apply fixers
+  const fixed = fixAll(llmOutput, {
+    types: errorTypes,
+    config: {
+      speakerLabels: ['Questioner', 'The Shaykh']
+    }
+  });
+  
+  console.log('Original:', llmOutput);
+  console.log('Fixed:', fixed.text);
+  console.log('Applied:', fixed.applied);
+  console.log('Skipped:', fixed.skipped);
+}
+```
+
+### Handling Unsupported Error Types
+
+`fixAll()` gracefully skips error types that don't have fixers:
+
+```typescript
+const result = fixAll(input, {
+  types: ['collapsed_speakers', 'arabic_leak'], // arabic_leak has no fixer
+  config: { speakerLabels: ['Questioner', 'The Shaykh'] }
+});
+
+console.log(result.applied);  // ['collapsed_speakers']
+console.log(result.skipped);  // ['arabic_leak']
+```
+
+## Integration with Validation
+
+Here's a complete workflow that validates, fixes, and re-validates:
+
+```typescript
+import { 
+  validateTranslationResponse, 
+  fixAll,
+  type ValidationError,
+  type FixResult
+} from 'wobble-bibble';
+
+async function validateAndFix(
+  segments: Segment[],
+  llmOutput: string,
+  maxAttempts: number = 3
+) {
+  let currentOutput = llmOutput;
+  let attempt = 0;
+  
+  while (attempt < maxAttempts) {
+    // Validate
+    const validation = validateTranslationResponse(segments, currentOutput);
+    
+    if (validation.errors.length === 0) {
+      return {
+        success: true,
+        output: currentOutput,
+        attempts: attempt
+      };
+    }
+    
+    // Extract fixable error types
+    const errorTypes = [...new Set(validation.errors.map(e => e.type))];
+    
+    // Try to fix
+    const fixed = fixAll(currentOutput, {
+      types: errorTypes
+    });
+    
+    // If no fixes were applied, we're stuck
+    if (fixed.applied.length === 0) {
+      return {
+        success: false,
+        output: currentOutput,
+        errors: validation.errors,
+        attempts: attempt
+      };
+    }
+    
+    currentOutput = fixed.text;
+    attempt++;
+  }
+  
+  return {
+    success: false,
+    output: currentOutput,
+    errors: validateTranslationResponse(segments, currentOutput).errors,
+    attempts: attempt
+  };
+}
+```
+
+## Practical Examples
+
+### Example 1: Fixing Real Fatawa Output
+
+```typescript
+import { fixCollapsedSpeakerLines } from 'wobble-bibble';
+
+const fatwaBad = `
+P254944 - Questioner: Is this correct? The Shaykh: Yes, it is. Questioner: What about this other case? The Shaykh: That is also correct.
+`.trim();
+
+// Infer labels automatically
+const fixed = fixCollapsedSpeakerLines(fatwaBad);
+
+console.log(fixed.text);
+/*
+P254944 - Questioner: Is this correct?
+The Shaykh: Yes, it is.
+Questioner: What about this other case?
+The Shaykh: That is also correct.
+*/
+
+console.log(`Fixed ${fixed.counts.fixCollapsedSpeakerLines} collapsed labels`);
+// Fixed 3 collapsed labels
+```
+
+### Example 2: Preserving Already-Correct Formatting
+
+```typescript
+const alreadyGood = `
+P1 - Questioner: Hi.
+The Shaykh: Hello.
+`.trim();
+
+const result = fixCollapsedSpeakerLines(alreadyGood, {
+  speakerLabels: ['Questioner', 'The Shaykh']
+});
+
+console.log(result.text === alreadyGood); // true
+console.log(result.applied.length);        // 0
+console.log(result.counts.fixCollapsedSpeakerLines); // 0
+```
+
+### Example 3: Handling Multiple Segments
+
+```typescript
+const multiSegment = `
+P1 - Questioner: Question 1. The Shaykh: Answer 1.
+P2 - Questioner: Question 2. The Shaykh: Answer 2. Questioner: Follow-up?
+`.trim();
+
+const result = fixCollapsedSpeakerLines(multiSegment);
+
+console.log(result.text);
+/*
+P1 - Questioner: Question 1.
+The Shaykh: Answer 1.
+P2 - Questioner: Question 2.
+The Shaykh: Answer 2.
+Questioner: Follow-up?
+*/
+```
+
+## When to Use Fixers
+
+<AccordionGroup>
+  <Accordion title="Use fixers when...">
+    - You're processing large batches and want to auto-correct minor formatting errors
+    - The error is purely formatting (not semantic)
+    - You've validated and confirmed the error is present
+    - You want to reduce manual correction work
+  </Accordion>
+
+  <Accordion title="Don't use fixers when...">
+    - The error is semantic (e.g., invented IDs, Arabic leak)
+    - You need 100% accuracy and want human review
+    - The fixer might introduce new errors in edge cases
+    - You're unsure if the fix is correct
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+  Fixers modify the LLM output programmatically. Always validate the fixed output to ensure the fixer didn't introduce new problems.
+</Warning>
+
+## Label Inference Algorithm
+
+The fixer uses this logic to infer speaker labels:
+
+<Steps>
+  <Step title="Find All Colon-Prefixed Patterns">
+    Scans for patterns like "Word:" or "Two Words:" at line starts.
+  </Step>
+  
+  <Step title="Filter by Word Count">
+    Ignores patterns with more than 2 words (e.g., "He said that:" is ignored).
+  </Step>
+  
+  <Step title="Filter by Length">
+    Ignores patterns longer than 28 characters.
+  </Step>
+  
+  <Step title="Count Occurrences">
+    Only keeps labels that appear 2+ times.
+  </Step>
+  
+  <Step title="Sort by First Appearance">
+    Orders labels by their first occurrence in the text.
+  </Step>
+</Steps>
+
+Example:
+
+```typescript
+import { inferSpeakerLabels } from 'wobble-bibble';
+
+const text = `
+Questioner: Question.
+The Shaykh: Answer.
+Questioner: Follow-up.
+`;
+
+const labels = inferSpeakerLabels(text);
+console.log(labels); // ['Questioner', 'The Shaykh']
+```
+
+## Testing Your Fixes
+
+Always test fixers with edge cases:
+
+```typescript
+import { fixCollapsedSpeakerLines } from 'wobble-bibble';
+import { describe, it, expect } from 'bun:test';
+
+describe('fixCollapsedSpeakerLines', () => {
+  it('should handle apostrophes in labels', () => {
+    const input = `P1 - Mu'adhdhin: Call. The Shaykh: Response.`;
+    const result = fixCollapsedSpeakerLines(input);
+    
+    expect(result.text).toContain('\nThe Shaykh:');
+  });
+  
+  it('should preserve punctuation', () => {
+    const input = `P1 - Something؟ The Shaykh: Reply.`;
+    const result = fixCollapsedSpeakerLines(input);
+    
+    expect(result.text).toBe(`P1 - Something؟\nThe Shaykh: Reply.`);
+  });
+  
+  it('should not change already-separated lines', () => {
+    const input = `P1 - Questioner: Hi.\nThe Shaykh: Hello.`;
+    const result = fixCollapsedSpeakerLines(input);
+    
+    expect(result.text).toBe(input);
+    expect(result.applied.length).toBe(0);
+  });
+});
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Validation" icon="check" href="/guides/validating-output">
+    Learn how to detect errors before fixing them
+  </Card>
+  <Card title="Fixer API" icon="book" href="/api/fixers/fix-collapsed-speaker-lines">
+    Full API reference for fixer functions
+  </Card>
+</CardGroup>

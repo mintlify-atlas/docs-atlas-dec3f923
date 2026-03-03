@@ -1,122 +1,121 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Wobble Bibble",
+  "theme": "palm",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#2E7D32",
+    "light": "#66BB6A",
+    "dark": "#1B5E20"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/ragaeeb/wobble-bibble"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/ragaeeb/wobble-bibble"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
+              "introduction",
               "quickstart",
-              "development"
+              "installation"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "concepts/prompts",
+              "concepts/validation",
+              "concepts/stacking"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Guides",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "guides/using-prompts",
+              "guides/validating-output",
+              "guides/fixing-errors",
+              "guides/custom-prompts"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Prompt Templates",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "prompts/overview",
+              "prompts/master-prompt",
+              "prompts/hadith",
+              "prompts/fiqh",
+              "prompts/tafsir",
+              "prompts/fatawa",
+              "prompts/encyclopedia-mixed",
+              "prompts/jarh-wa-tadil",
+              "prompts/usul-al-fiqh"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Prompts",
             "pages": [
-              "api-reference/introduction"
+              "api/prompts/get-prompt",
+              "api/prompts/get-prompts",
+              "api/prompts/get-stacked-prompt",
+              "api/prompts/get-master-prompt",
+              "api/prompts/get-prompt-ids",
+              "api/prompts/stack-prompts"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Validation",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/validation/validate-translation-response",
+              "api/validation/validation-error-type-info"
+            ]
+          },
+          {
+            "group": "Text Utils",
+            "pages": [
+              "api/text-utils/format-excerpts-for-prompt",
+              "api/text-utils/normalize-translation-text",
+              "api/text-utils/normalize-translation-text-with-map",
+              "api/text-utils/extract-translation-ids",
+              "api/text-utils/parse-translations",
+              "api/text-utils/parse-translations-in-order"
+            ]
+          },
+          {
+            "group": "Fixers",
+            "pages": [
+              "api/fixers/fix-all",
+              "api/fixers/fix-collapsed-speaker-lines"
+            ]
+          },
+          {
+            "group": "Types",
+            "pages": [
+              "api/types/segment",
+              "api/types/validation-error",
+              "api/types/validation-config",
+              "api/types/stacked-prompt",
+              "api/types/fix-config",
+              "api/types/fix-result"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

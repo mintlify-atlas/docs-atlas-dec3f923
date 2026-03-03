@@ -1,0 +1,257 @@
+---
+title: "Hadith Prompt"
+description: "For translating hadith collections with isnad chains and narrator evaluation"
+---
+
+The hadith prompt is specialized for translating **hadith literature** - collections of Prophetic reports that include chains of transmission (isnad) and narrator criticism.
+
+## What It's For
+
+Use the hadith prompt when translating:
+
+- Hadith collections (Bukhari, Muslim, Abu Dawud, etc.)
+- Works with isnad chains and matn (text)
+- Texts containing narrator evaluation
+- Books with hadith codes/rumuz (kh, m, d, t, etc.)
+
+<Note>
+The hadith prompt is **automatically stacked** on top of the master prompt. You get all master rules plus hadith-specific guidance.
+</Note>
+
+## Access the Hadith Prompt
+
+```typescript
+import { getPrompt } from 'wobble-bibble';
+
+const hadithPrompt = getPrompt('hadith');
+console.log(hadithPrompt.name); // "Hadith"
+console.log(hadithPrompt.content); // Master + hadith rules combined
+```
+
+## Isnad Verb Mappings
+
+The hadith prompt defines precise translations for transmission verbs:
+
+| Arabic | English | Notes |
+|--------|---------|-------|
+| حدثنا | Narrated to us | Direct hearing |
+| أخبرنا | Informed us | Reading to teacher |
+| عن | From | Reporting from |
+| سمعت | I heard | First person |
+| أنا | Informed us | Short for أخبرنا/أنبأنا |
+
+<Warning>
+**Critical:** `أنا` in isnad context means "Informed us" (NOT "I"). This is transmission shorthand, not first-person pronoun.
+</Warning>
+
+### Example Translation
+
+**Source:**
+```
+حدثنا عبد الله بن يوسف أخبرنا مالك عن نافع عن ابن عمر
+```
+
+**Output:**
+```
+ʿAbd Allāh b. Yūsuf narrated to us; Mālik informed us; from Nāfiʿ; from Ibn ʿUmar
+```
+
+## Chain Markers
+
+### Tahwil (ح)
+
+Indicates a switch to a parallel chain:
+
+```
+P123 - Aḥmad narrated to us from Yaḥyá...
+(ح) And Muḥammad narrated to us from Sufyān...
+```
+
+### Broken Chains
+
+- **Mursal** - Missing companion (Successor → Prophet)
+- **Munqatiʿ** - Missing link in the middle
+
+Translate these terms as-is when they appear in the text.
+
+## Narrator Names
+
+### Full ALA-LC Transliteration
+
+Use complete ALA-LC with diacritics for all narrator names:
+
+```
+ʿAbd Allāh b. Yūsuf
+Muḥammad b. Ismāʿīl al-Bukhārī
+Abū Hurayrah
+```
+
+### Name Connectors
+
+<Note>
+**Critical distinction:** 
+- Mid-chain: بن/ابن → `b.` (e.g., Aḥmad b. Ḥanbal)
+- Initial/standalone: ابن → `Ibn` (e.g., Ibn Taymiyyah)
+</Note>
+
+### Do Not Expand Lineages
+
+Transliterate exactly what appears in the source. Do not:
+
+- Add missing ancestors
+- Expand shortened names
+- Guess full identities
+
+**Source:** `عن مالك`  
+**Output:** `from Mālik` (NOT "from Mālik b. Anas al-Aṣbaḥī")
+
+## Jarh/Ta'dil (Narrator Evaluation)
+
+When narrator criticism terms appear, use `translit (English)` format:
+
+```
+fīhi naẓar (he needs to be looked into)
+thiqah (trustworthy)
+ḍaʿīf (weak)
+matrūk (abandoned)
+```
+
+**Do NOT** translate to English-only:
+
+❌ "He is weak"  
+✅ "He is ḍaʿīf (weak)"
+
+## Book Codes (Rumuz)
+
+Preserve hadith collection codes exactly as they appear:
+
+| Code | Collection |
+|------|------------|
+| kh | Bukhari |
+| m | Muslim |
+| d | Abu Dawud |
+| t | Tirmidhi |
+| s | Nasa'i |
+| q | Daraqutni |
+| 4 | The four (Abu Dawud, Tirmidhi, Nasa'i, Ibn Majah) |
+
+### Example
+
+**Source:**
+```
+رواه البخاري (kh 1234) ومسلم (m 5678)
+```
+
+**Output:**
+```
+Reported by al-Bukhārī (kh 1234) and Muslim (m 5678)
+```
+
+<Warning>
+**Do NOT expand codes** unless the Arabic text itself expands them. Keep `(kh)` as `(kh)`, not `(Bukhari)`.
+</Warning>
+
+## Isnad vs. Matn
+
+### Isnad (Chain)
+
+Use full ALA-LC transliteration for names:
+
+```
+P405 - Muḥammad b. Bashshār narrated to us; Yaḥyá informed us; from ʿUbayd Allāh; from Nāfiʿ; from Ibn ʿUmar
+```
+
+### Matn (Text)
+
+Translate into English, defining technical terms:
+
+```
+The Prophet ﷺ said: "Fasting is obligatory (wājib) during Ramaḍān."
+```
+
+## When to Use
+
+✅ **Use `hadith` prompt for:**
+- Pure hadith collections
+- Biographical dictionaries with isnads
+- Hadith commentary (sharh) with chains
+- Takhrij works (hadith authentication)
+
+❌ **Don't use for:**
+- Fiqh texts without isnads → Use `fiqh`
+- Fatwa Q&A without chains → Use `fatawa`
+- Mixed scholarly works → Use `encyclopedia_mixed`
+
+## Common Pitfalls
+
+### 1. Ana Translation
+
+❌ Wrong: "I informed us" (nonsensical)  
+✅ Right: "Informed us" (transmission verb)
+
+### 2. Name Connector Errors
+
+❌ Wrong: `Aḥmad Ibn Ḥanbal` (when mid-chain)  
+✅ Right: `Aḥmad b. Ḥanbal`
+
+### 3. Expanding Codes
+
+❌ Wrong: `(Bukhari)` when source says `(kh)`  
+✅ Right: `(kh)`
+
+### 4. English-only Terms
+
+❌ Wrong: "He is weak in hadith"  
+✅ Right: "He is ḍaʿīf (weak) in hadith"
+
+## Example Output
+
+**Input segment:**
+```
+P1234 - حدثنا عبد الله بن يوسف قال حدثنا مالك عن نافع عن ابن عمر رضي الله عنهما أن رسول الله صلى الله عليه وسلم قال: "بني الإسلام على خمس"
+```
+
+**Expected output:**
+```
+P1234 - ʿAbd Allāh b. Yūsuf narrated to us; he said: Mālik narrated to us; from Nāfiʿ; from Ibn ʿUmar, may Allah be pleased with them both, that the Messenger of Allah ﷺ said: "Islam is built upon five [pillars]."
+```
+
+## Integration with Validation
+
+The hadith prompt output is validated by wobble-bibble's validation engine:
+
+```typescript
+import { getPrompt, validateTranslationResponse } from 'wobble-bibble';
+
+const prompt = getPrompt('hadith');
+
+// Send prompt.content to LLM...
+const llmOutput = "P1234 - ʿAbd Allāh b. Yūsuf...";
+
+// Validate the response
+const validation = validateTranslationResponse(llmOutput, sourceSegments);
+
+if (!validation.isValid) {
+  console.error('Validation errors:', validation.errors);
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Encyclopedia Mixed" icon="layer-group" href="/prompts/encyclopedia-mixed">
+    For mixed scholarly works with hadith + other genres
+  </Card>
+  
+  <Card title="Jarh wa Tadil" icon="user-check" href="/prompts/jarh-wa-tadil">
+    Specialized prompt for narrator criticism texts
+  </Card>
+  
+  <Card title="Validation Guide" icon="circle-check" href="/validation/overview">
+    Learn how outputs are validated
+  </Card>
+  
+  <Card title="Prompt API" icon="code" href="/api-reference/prompts">
+    Complete prompt management API reference
+  </Card>
+</CardGroup>

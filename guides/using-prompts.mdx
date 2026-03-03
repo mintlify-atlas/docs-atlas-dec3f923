@@ -1,0 +1,321 @@
+---
+title: Using Prompts
+description: Learn how to access and use wobble-bibble's built-in translation prompts for Islamic texts
+---
+
+Wobble-bibble provides 8 specialized translation prompts for different types of Islamic texts. Each prompt combines a master prompt with domain-specific rules to guide LLM translation.
+
+## Getting Available Prompts
+
+Use `getPrompts()` to retrieve all available prompts at once:
+
+```typescript
+import { getPrompts } from 'wobble-bibble';
+
+const prompts = getPrompts();
+
+prompts.forEach(prompt => {
+  console.log(`${prompt.id}: ${prompt.name}`);
+  console.log(`Is Master: ${prompt.isMaster}`);
+  console.log(`Content length: ${prompt.content.length} chars`);
+});
+```
+
+<Info>
+  All addon prompts (like `hadith`, `fiqh`, `tafsir`) are automatically stacked with the master prompt. You don't need to combine them manually.
+</Info>
+
+## Getting a Specific Prompt
+
+For most use cases, you'll want to retrieve a specific prompt by ID:
+
+```typescript
+import { getPrompt } from 'wobble-bibble';
+
+// Get the Hadith prompt (master + hadith addon)
+const hadithPrompt = getPrompt('hadith');
+
+console.log(hadithPrompt.id);        // 'hadith'
+console.log(hadithPrompt.name);      // 'Hadith'
+console.log(hadithPrompt.isMaster);  // false
+console.log(hadithPrompt.content);   // Full stacked prompt text
+```
+
+### Type Safety
+
+The `getPrompt()` function is strongly typed, so TypeScript will catch invalid prompt IDs at compile time:
+
+```typescript
+import type { PromptId } from 'wobble-bibble';
+
+// ✅ Valid - TypeScript knows these IDs exist
+const valid: PromptId[] = [
+  'master_prompt',
+  'hadith',
+  'fiqh',
+  'tafsir',
+  'fatawa',
+  'encyclopedia_mixed',
+  'jarh_wa_tadil',
+  'usul_al_fiqh'
+];
+
+// ❌ Invalid - TypeScript error
+const invalid = getPrompt('unknown_prompt');
+```
+
+## Available Prompt IDs
+
+Use `getPromptIds()` to get a list of all available prompt IDs (useful for dropdowns or validation):
+
+```typescript
+import { getPromptIds } from 'wobble-bibble';
+
+const ids = getPromptIds();
+console.log(ids); // ['master_prompt', 'hadith', 'fiqh', ...]
+```
+
+## Using Prompts with LLMs
+
+Here's a complete example of using a prompt with an LLM to translate Arabic segments:
+
+<CodeGroup>
+```typescript OpenAI
+import { getPrompt, formatExcerptsForPrompt } from 'wobble-bibble';
+import OpenAI from 'openai';
+
+const openai = new OpenAI();
+
+const segments = [
+  { id: 'P1234', text: 'نعم، هذا صحيح.' },
+  { id: 'P1235', text: 'قال الشيخ: لا بأس.' }
+];
+
+// Get the Hadith prompt
+const prompt = getPrompt('hadith');
+
+// Format segments for the LLM
+const userMessage = formatExcerptsForPrompt(segments, '');
+
+const completion = await openai.chat.completions.create({
+  model: 'gpt-4',
+  messages: [
+    { role: 'system', content: prompt.content },
+    { role: 'user', content: userMessage }
+  ]
+});
+
+const translation = completion.choices[0].message.content;
+```
+
+```typescript Anthropic
+import { getPrompt, formatExcerptsForPrompt } from 'wobble-bibble';
+import Anthropic from '@anthropic-ai/sdk';
+
+const anthropic = new Anthropic();
+
+const segments = [
+  { id: 'P1234', text: 'نعم، هذا صحيح.' },
+  { id: 'P1235', text: 'قال الشيخ: لا بأس.' }
+];
+
+const prompt = getPrompt('hadith');
+const userMessage = formatExcerptsForPrompt(segments, '');
+
+const message = await anthropic.messages.create({
+  model: 'claude-3-5-sonnet-20241022',
+  max_tokens: 4096,
+  system: prompt.content,
+  messages: [
+    { role: 'user', content: userMessage }
+  ]
+});
+
+const translation = message.content[0].text;
+```
+</CodeGroup>
+
+## Getting Just the Content
+
+If you only need the prompt text (not the metadata), use `getStackedPrompt()`:
+
+```typescript
+import { getStackedPrompt } from 'wobble-bibble';
+
+const promptText = getStackedPrompt('fiqh');
+// Returns: string with full prompt content
+```
+
+## Prompt Structure
+
+<Steps>
+  <Step title="Master Prompt">
+    The master prompt contains universal rules that apply to all translations:
+    - Output format requirements (plain text, no Markdown)
+    - ID integrity rules (preserve segment IDs exactly)
+    - Transliteration standards (ALA-LC with diacritics)
+    - Forbidden patterns (no Arabic script except ﷺ)
+  </Step>
+  
+  <Step title="Addon Prompt">
+    Each specialized addon adds domain-specific rules:
+    - **Hadith**: Isnad chain formatting, narrator name handling
+    - **Fiqh**: Legal terminology, ruling formats
+    - **Tafsir**: Quranic verse references, exegesis style
+    - **Fatawa**: Q&A structure, speaker label preservation
+  </Step>
+  
+  <Step title="Automatic Stacking">
+    When you call `getPrompt('hadith')`, wobble-bibble automatically:
+    1. Loads the master prompt
+    2. Loads the hadith addon
+    3. Combines them with a newline: `master + '\n' + addon`
+    4. Returns the stacked result
+  </Step>
+</Steps>
+
+## Choosing the Right Prompt
+
+<AccordionGroup>
+  <Accordion title="Hadith - Prophetic traditions with chains of transmission">
+    Use for texts containing:
+    - Isnad chains (e.g., "عن أبي هريرة عن النبي")
+    - Hadith commentary (Sharh)
+    - Narrator criticism embedded in hadith discussions
+    
+    ```typescript
+    const prompt = getPrompt('hadith');
+    ```
+  </Accordion>
+
+  <Accordion title="Fiqh - Islamic jurisprudence and legal rulings">
+    Use for texts containing:
+    - Legal rulings (wājib, mandūb, ḥarām, etc.)
+    - Fiqh terminology (ṭahārah, ṣalāh, etc.)
+    - Legal reasoning and arguments
+    
+    ```typescript
+    const prompt = getPrompt('fiqh');
+    ```
+  </Accordion>
+
+  <Accordion title="Tafsir - Quranic exegesis and commentary">
+    Use for texts containing:
+    - Verse-by-verse Quran commentary
+    - Quranic references and citations
+    - Linguistic analysis of Quranic words
+    
+    ```typescript
+    const prompt = getPrompt('tafsir');
+    ```
+  </Accordion>
+
+  <Accordion title="Fatawa - Q&A format between questioner and scholar">
+    Use for texts containing:
+    - Question and answer dialogues
+    - Speaker labels (السائل, الشيخ)
+    - Multi-turn conversations
+    
+    ```typescript
+    const prompt = getPrompt('fatawa');
+    ```
+  </Accordion>
+
+  <Accordion title="Encyclopedia Mixed - Polymath works switching between disciplines">
+    Use for texts that mix multiple genres:
+    - Works by scholars like Ibn Taymiyyah or Al-Albani
+    - Texts that switch between hadith, fiqh, and other topics
+    - No mode tags will appear in output
+    
+    ```typescript
+    const prompt = getPrompt('encyclopedia_mixed');
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Working with the Master Prompt
+
+If you need to create a custom addon, you can access the master prompt directly:
+
+```typescript
+import { getMasterPrompt, stackPrompts } from 'wobble-bibble';
+
+const masterPrompt = getMasterPrompt();
+const customAddon = `
+CUSTOM RULE:
+Always translate technical terms with parenthetical glosses.
+`;
+
+const customPrompt = stackPrompts(masterPrompt, customAddon);
+```
+
+<Warning>
+  The master prompt should never be modified. It contains critical rules for ID integrity, output formatting, and transliteration standards. Only create custom addons that extend these rules.
+</Warning>
+
+## Practical Examples
+
+### Building a Translation UI
+
+```typescript
+import { getPromptIds, getPrompt } from 'wobble-bibble';
+
+function PromptSelector() {
+  const [selectedId, setSelectedId] = useState<PromptId>('hadith');
+  const ids = getPromptIds();
+  
+  const handleTranslate = async () => {
+    const prompt = getPrompt(selectedId);
+    // Use prompt.content with your LLM...
+  };
+  
+  return (
+    <select value={selectedId} onChange={e => setSelectedId(e.target.value)}>
+      {ids.map(id => (
+        <option key={id} value={id}>{id}</option>
+      ))}
+    </select>
+  );
+}
+```
+
+### Batch Translation with Different Prompts
+
+```typescript
+import { getPrompt, formatExcerptsForPrompt } from 'wobble-bibble';
+
+interface TranslationJob {
+  promptType: PromptId;
+  segments: Segment[];
+}
+
+async function processBatch(jobs: TranslationJob[]) {
+  const results = [];
+  
+  for (const job of jobs) {
+    const prompt = getPrompt(job.promptType);
+    const userMessage = formatExcerptsForPrompt(job.segments, '');
+    
+    // Call your LLM here with prompt.content and userMessage
+    const translation = await callLLM(prompt.content, userMessage);
+    
+    results.push({
+      promptType: job.promptType,
+      translation
+    });
+  }
+  
+  return results;
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Validating Output" icon="check" href="/guides/validating-output">
+    Learn how to validate LLM translations for errors
+  </Card>
+  <Card title="Custom Prompts" icon="wand-magic-sparkles" href="/guides/custom-prompts">
+    Create custom prompts for specialized use cases
+  </Card>
+</CardGroup>

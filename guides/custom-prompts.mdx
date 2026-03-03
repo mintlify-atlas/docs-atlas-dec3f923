@@ -1,0 +1,443 @@
+---
+title: Custom Prompts
+description: Create custom translation prompts by extending the master prompt with specialized rules
+---
+
+Wobble-bibble's prompt system is designed to be extensible. You can create custom prompts by combining the master prompt with your own specialized rules.
+
+## Understanding Prompt Stacking
+
+Prompt stacking is the core concept behind wobble-bibble's prompt system:
+
+<Steps>
+  <Step title="Master Prompt">
+    The master prompt contains universal rules that apply to **all** translations:
+    - Output format (plain text, no Markdown)
+    - ID integrity (preserve segment IDs exactly)
+    - Transliteration standards (ALA-LC)
+    - Forbidden patterns (no Arabic except ﷺ)
+  </Step>
+  
+  <Step title="Addon Prompt">
+    An addon prompt adds **domain-specific** rules:
+    - Genre-specific terminology
+    - Structural requirements
+    - Special formatting needs
+  </Step>
+  
+  <Step title="Stacked Prompt">
+    The stacked prompt combines both:
+    ```
+    master_content
+    \n
+    addon_content
+    ```
+  </Step>
+</Steps>
+
+## The `stackPrompts` Function
+
+Use `stackPrompts()` to manually combine prompts:
+
+```typescript
+import { getMasterPrompt, stackPrompts } from 'wobble-bibble';
+
+const master = getMasterPrompt();
+const customAddon = `
+CUSTOM RULES:
+- Always translate technical terms with parenthetical glosses.
+- Preserve line breaks around speaker turns.
+`;
+
+const customPrompt = stackPrompts(master, customAddon);
+```
+
+### How It Works
+
+```typescript
+export const stackPrompts = (master: string, addon: string): string => {
+  if (!master) return addon;
+  if (!addon) return master;
+  return `${master}\n${addon}`;
+};
+```
+
+<Info>
+  If either prompt is empty, `stackPrompts()` returns the non-empty one. This makes it safe to use with optional addons.
+</Info>
+
+## Creating a Custom Addon
+
+Let's create a custom addon for translating poetry:
+
+```typescript
+import { getMasterPrompt, stackPrompts } from 'wobble-bibble';
+
+const poetryAddon = `
+GENRE: Classical Arabic Poetry (Shiʿr)
+
+STRUCTURE:
+- Preserve verse structure (each bayt/couplet on its own line)
+- Maintain hemistichs (ṣadr and ʿajuz) with a clear break
+- Do NOT merge lines or combine verses
+
+METER & RHYME:
+- Mention meter (baḥr) if explicitly named in source
+- Preserve rhyme scheme indicators (qāfiyah)
+- Transliterate metrical terms: baḥr al-ṭawīl, etc.
+
+POETIC DEVICES:
+- Translate jinās (paronomasia) with a note: "wordplay on X"
+- Translate ṭibāq (antithesis) preserving contrast
+- Mark tawriyah (double entendre) with parenthetical clarification
+
+VOCABULARY:
+- Use "ode" for qaṣīdah, "fragment" for qiṭʿah
+- Transliterate genre names: nasīb, fakhr, rithāʾ, etc.
+- Translate imagery literally, preserve metaphors
+
+FORMATTING:
+Poem Title - Poet Name
+verse 1a    verse 1b
+verse 2a    verse 2b
+`;
+
+const poetryPrompt = stackPrompts(getMasterPrompt(), poetryAddon);
+```
+
+## Real-World Example: Custom Tafsir Rules
+
+Here's how you might extend the built-in Tafsir prompt with custom rules:
+
+```typescript
+import { getPrompt, getMasterPrompt, stackPrompts } from 'wobble-bibble';
+
+// Get the built-in Tafsir prompt as a base
+const tafsirBase = getPrompt('tafsir');
+
+// Add custom rules for a specific Tafsir work
+const customTafsirRules = `
+ADDITIONAL RULES FOR TAFSIR AL-JALALAYN:
+
+1. ATTRIBUTION:
+   - Distinguish Jalāl al-Dīn al-Maḥallī vs. Jalāl al-Dīn al-Suyūṭī
+   - Use full names on first mention, then "al-Maḥallī" / "al-Suyūṭī"
+
+2. QURANIC INSERTIONS:
+   - When Quran text is embedded mid-explanation, use «guillemets»
+   - Example: He explained «and those who believe» as referring to...
+
+3. GRAMMATICAL NOTES:
+   - Translate iʿrāb discussions with English grammar terms
+   - marfūʿ = nominative, manṣūb = accusative, etc.
+
+4. BREVITY:
+   - This tafsir is extremely concise - keep translations equally brief
+   - Do NOT expand or add explanatory text
+`;
+
+// Stack: master + tafsir + custom
+const customPrompt = stackPrompts(tafsirBase.content, customTafsirRules);
+```
+
+## Addon Best Practices
+
+<AccordionGroup>
+  <Accordion title="Keep addons focused">
+    Each addon should target **one genre or use case**. Don't create mega-addons that try to handle everything.
+    
+    ```typescript
+    // ❌ Bad: Too broad
+    const badAddon = `Rules for Hadith, Fiqh, and Tafsir...`;
+    
+    // ✅ Good: Focused
+    const goodAddon = `Rules for Hadith isnad chains...`;
+    ```
+  </Accordion>
+
+  <Accordion title="Don't contradict the master">
+    The master prompt contains critical rules (ID integrity, no Arabic, etc.). Don't contradict them.
+    
+    ```typescript
+    // ❌ Bad: Contradicts master
+    const badAddon = `ALLOW ARABIC SCRIPT IN OUTPUT`;
+    
+    // ✅ Good: Extends master
+    const goodAddon = `ADDITIONAL TRANSLITERATION RULES...`;
+    ```
+  </Accordion>
+
+  <Accordion title="Use explicit negations">
+    LLMs respond better to explicit "DO NOT" statements than soft suggestions.
+    
+    ```typescript
+    // ❌ Weak: Soft suggestion
+    const weak = `Try to preserve line breaks.`;
+    
+    // ✅ Strong: Explicit negation
+    const strong = `DO NOT merge source lines. Each line must stay separate.`;
+    ```
+  </Accordion>
+
+  <Accordion title="Provide examples">
+    Include concrete examples in your addon to reduce ambiguity.
+    
+    ```typescript
+    const withExamples = `
+    TERM PAIRS:
+    - ṣalāh (ritual prayer)
+    - zakāh (alms-tax)
+    - NOT: salah, zakat (missing diacritics)
+    `;
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Testing Custom Prompts
+
+Always validate your custom prompts with real examples:
+
+```typescript
+import { 
+  stackPrompts, 
+  getMasterPrompt, 
+  formatExcerptsForPrompt,
+  validateTranslationResponse 
+} from 'wobble-bibble';
+
+const customAddon = `
+// Your custom rules here
+`;
+
+const customPrompt = stackPrompts(getMasterPrompt(), customAddon);
+
+// Test with real segments
+const testSegments = [
+  { id: 'P1', text: 'نص اختباري...' },
+  { id: 'P2', text: 'نص آخر...' }
+];
+
+const llmInput = formatExcerptsForPrompt(testSegments, customPrompt);
+
+// Call your LLM
+const llmOutput = await callYourLLM(llmInput);
+
+// Validate the output
+const validation = validateTranslationResponse(testSegments, llmOutput);
+
+if (validation.errors.length > 0) {
+  console.error('Validation failed:', validation.errors);
+} else {
+  console.log('Custom prompt works!');
+}
+```
+
+## Advanced: Multi-Level Stacking
+
+You can stack multiple addons together:
+
+```typescript
+import { getMasterPrompt, stackPrompts } from 'wobble-bibble';
+
+const master = getMasterPrompt();
+
+const baseAddon = `
+BASE RULES FOR SCHOLARLY TEXTS:
+- Preserve footnote markers
+- Transliterate author names
+`;
+
+const specificAddon = `
+SPECIFIC RULES FOR IBN HAJAR:
+- Use "Ibn Ḥajar" (not "al-ʿAsqalānī") after first mention
+`;
+
+// Stack all three
+const level1 = stackPrompts(master, baseAddon);
+const level2 = stackPrompts(level1, specificAddon);
+
+console.log(level2);
+// Contains: master + baseAddon + specificAddon
+```
+
+## Type-Safe Custom Prompts
+
+Create a type-safe wrapper for your custom prompts:
+
+```typescript
+import { getMasterPrompt, stackPrompts, type StackedPrompt } from 'wobble-bibble';
+
+type CustomPromptId = 'poetry' | 'modern_arabic' | 'legal_document';
+
+const CUSTOM_ADDONS: Record<CustomPromptId, string> = {
+  poetry: `/* poetry rules */`,
+  modern_arabic: `/* modern rules */`,
+  legal_document: `/* legal rules */`
+};
+
+function getCustomPrompt(id: CustomPromptId): StackedPrompt {
+  const master = getMasterPrompt();
+  const addon = CUSTOM_ADDONS[id];
+  
+  return {
+    id: id as any, // Cast to PromptId
+    name: id.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    content: stackPrompts(master, addon),
+    isMaster: false
+  };
+}
+
+// Usage
+const poetryPrompt = getCustomPrompt('poetry');
+```
+
+## Anatomy of a Good Addon
+
+Here's a template for creating effective addons:
+
+```typescript
+const addonTemplate = `
+# GENRE: [Name of text type]
+
+## STRUCTURE:
+- [How content should be organized]
+- [Line break rules]
+- [Paragraph rules]
+
+## VOCABULARY:
+- [Term 1]: [how to handle]
+- [Term 2]: [how to handle]
+- [Term 3]: [how to handle]
+
+## FORMATTING:
+- [Special formatting rules]
+- [Citation style]
+- [Reference format]
+
+## EXAMPLES:
+[Provide 2-3 concrete examples showing input → output]
+
+## CRITICAL NEGATIONS:
+- DO NOT [common mistake 1]
+- DO NOT [common mistake 2]
+- NEVER [common mistake 3]
+`;
+```
+
+## Common Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Modern Arabic News" icon="newspaper">
+    ```typescript
+    const newsAddon = `
+    MODERN ARABIC NEWS:
+    - Use plain English spellings for place names
+    - Translate political titles literally
+    - Preserve datelines and bylines
+    `;
+    ```
+  </Card>
+
+  <Card title="Historical Chronicles" icon="book">
+    ```typescript
+    const chronicleAddon = `
+    HISTORICAL CHRONICLES:
+    - Preserve Hijri dates: 123 AH
+    - Transliterate dynasty names
+    - Keep event markers (في سنة...)
+    `;
+    ```
+  </Card>
+
+  <Card title="Legal Documents" icon="scale-balanced">
+    ```typescript
+    const legalAddon = `
+    LEGAL DOCUMENTS:
+    - Use formal register
+    - Preserve article/clause numbers
+    - Translate legal terms precisely
+    `;
+    ```
+  </Card>
+
+  <Card title="Poetry Collections" icon="feather">
+    ```typescript
+    const poetryAddon = `
+    POETRY COLLECTIONS:
+    - Preserve verse structure
+    - Maintain meter annotations
+    - Note rhyme schemes
+    `;
+    ```
+  </Card>
+</CardGroup>
+
+## Debugging Custom Prompts
+
+If your custom prompt isn't working as expected:
+
+<Steps>
+  <Step title="Verify Stacking">
+    Print the stacked prompt to ensure it combines correctly:
+    ```typescript
+    console.log(customPrompt);
+    // Should show: master content + \n + addon content
+    ```
+  </Step>
+  
+  <Step title="Test in Isolation">
+    Test the addon alone (without the master) to isolate issues:
+    ```typescript
+    const testPrompt = stackPrompts('', customAddon);
+    ```
+  </Step>
+  
+  <Step title="Check for Conflicts">
+    Look for rules that contradict each other or the master:
+    ```typescript
+    // Search for conflicting keywords
+    if (master.includes('NO MARKDOWN') && addon.includes('use **bold**')) {
+      console.warn('Conflict detected!');
+    }
+    ```
+  </Step>
+  
+  <Step title="Validate Output">
+    Use validation to see what errors the LLM produces:
+    ```typescript
+    const validation = validateTranslationResponse(segments, llmOutput);
+    console.log(validation.errors); // Shows what went wrong
+    ```
+  </Step>
+</Steps>
+
+## When NOT to Use Custom Prompts
+
+<Warning>
+  Don't create custom prompts for:
+  - **One-off tasks** - Just modify the LLM system message directly
+  - **Minor tweaks** - Use the built-in prompts with post-processing instead
+  - **Testing** - Create throwaway prompts for experiments, not production use
+</Warning>
+
+## Sharing Custom Prompts
+
+If you create a useful custom prompt, consider contributing it back to wobble-bibble:
+
+1. **Document it thoroughly** - Include examples, edge cases, and rationale
+2. **Test it extensively** - Validate with at least 10 real examples
+3. **Follow the addon template** - Use the structure from this guide
+4. **Submit a PR** - Add it to `prompts/` directory with tests
+
+See the [Contributing Guide](https://github.com/ragaeeb/wobble-bibble/blob/main/CONTRIBUTING.md) for details.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Using Prompts" icon="book-open" href="/guides/using-prompts">
+    Learn how to access built-in prompts
+  </Card>
+  <Card title="Prompt Templates" icon="list" href="/prompts/overview">
+    Browse all available prompt templates
+  </Card>
+</CardGroup>

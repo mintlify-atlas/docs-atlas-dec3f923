@@ -1,0 +1,121 @@
+---
+title: Introduction
+description: TypeScript library for Islamic text translation prompts with LLM output validation and prompt stacking utilities
+---
+
+<img
+  className="block dark:hidden"
+  src="https://img.shields.io/npm/v/wobble-bibble.svg"
+  alt="npm version"
+/>
+<img
+  className="hidden dark:block"
+  src="https://img.shields.io/npm/v/wobble-bibble.svg"
+  alt="npm version"
+/>
+
+wobble-bibble is a TypeScript library designed for academic-grade Islamic text translation. It provides optimized prompts for LLM translation, output validation to catch hallucinations, and prompt stacking utilities for combining master prompts with specialized domain prompts.
+
+Live demo: [wobble-bibble.surge.sh](https://wobble-bibble.surge.sh)
+
+## Features
+
+<CardGroup cols={2}>
+  <Card
+    title="Bundled prompts"
+    icon="file-lines"
+    href="#bundled-prompts"
+  >
+    8 optimized translation prompts for Hadith, Fiqh, Tafsir, and more with strongly-typed access
+  </Card>
+  <Card
+    title="Translation validation"
+    icon="shield-check"
+    href="#translation-validation"
+  >
+    Catch LLM hallucinations like malformed segment IDs, Arabic leaks, and forbidden terms
+  </Card>
+  <Card
+    title="Prompt stacking"
+    icon="layer-group"
+    href="#prompt-stacking"
+  >
+    Master and specialized prompts combined automatically for optimal results
+  </Card>
+  <Card
+    title="Gold standards"
+    icon="star"
+    href="https://github.com/ragaeeb/wobble-bibble/blob/main/docs/gold-standard.md"
+  >
+    High-fidelity reference dataset for benchmarking translation quality
+  </Card>
+</CardGroup>
+
+## Bundled prompts
+
+The library includes 8 specialized prompts optimized through rigorous testing:
+
+| Prompt ID | Name | Use case |
+|-----------|------|----------|
+| `master_prompt` | Master Prompt | Universal grounding rules |
+| `hadith` | Hadith | Isnad-heavy texts, Sharh |
+| `fiqh` | Fiqh | Legal terminology |
+| `tafsir` | Tafsir | Quranic exegesis |
+| `fatawa` | Fatawa | Q&A format |
+| `encyclopedia_mixed` | Encyclopedia Mixed | Polymath works |
+| `jarh_wa_tadil` | Jarh Wa Tadil | Narrator criticism |
+| `usul_al_fiqh` | Usul Al Fiqh | Legal methodology |
+
+Each specialized prompt is automatically stacked with the master prompt to ensure consistent output quality while maintaining domain-specific requirements.
+
+## Translation validation
+
+The validation system catches common LLM translation failures:
+
+- **Invalid marker format**: Malformed segment IDs like `B1234$5` or `P123ab`
+- **Arabic leak**: Arabic script in output (except ﷺ)
+- **Invented IDs**: Segment IDs that don't exist in the source corpus
+- **Missing ID gaps**: Skipped segments between consecutive IDs
+- **Duplicate IDs**: Same segment ID appearing multiple times
+- **Truncated segments**: Incomplete translations marked with `...` or `[INCOMPLETE]`
+- **Collapsed speakers**: Speaker labels appearing mid-line instead of on new lines
+- **Empty parentheses**: Excessive `()` patterns indicating failed term-pairs
+
+Every validation error includes precise character ranges pointing to the exact location in the raw response string.
+
+## Prompt stacking
+
+Prompt stacking combines the universal master prompt with specialized domain addons:
+
+```typescript
+import { getPrompt } from 'wobble-bibble';
+
+const hadithPrompt = getPrompt('hadith');
+console.log(hadithPrompt.content);
+// Contains: Master prompt rules + Hadith-specific isnad handling
+```
+
+This ensures all translations follow:
+- **ALA-LC transliteration** with diacritics
+- **Plain text output** (no Markdown)
+- **Segment ID integrity** (no invented or skipped IDs)
+- **Domain-specific conventions** (e.g., narrator chains for Hadith)
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Installation"
+    icon="download"
+    href="/installation"
+  >
+    Install wobble-bibble with npm, yarn, pnpm, or bun
+  </Card>
+  <Card
+    title="Quickstart"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Get started with prompts and validation in 5 minutes
+  </Card>
+</CardGroup>

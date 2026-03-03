@@ -1,0 +1,295 @@
+---
+title: "Fatawa Prompt"
+description: "For translating legal opinions in Q&A format with questioner/scholar dialogue"
+---
+
+The fatawa prompt is specialized for translating **Islamic legal opinions** (fatawa) - works structured as questions from laypeople and answers from scholars.
+
+## What It's For
+
+Use the fatawa prompt when translating:
+
+- Fatwa compilations (Ibn Baz, Ibn Uthaymin, etc.)
+- Q&A format religious texts
+- Scholar responses to specific questions
+- Works with "Questioner/Shaykh" dialogue structure
+
+<Note>
+The fatawa prompt is **automatically stacked** on top of the master prompt. You get all master rules plus fatawa-specific guidance.
+</Note>
+
+## Access the Fatawa Prompt
+
+```typescript
+import { getPrompt } from 'wobble-bibble';
+
+const fatawaPrompt = getPrompt('fatawa');
+console.log(fatawaPrompt.name); // "Fatawa"
+console.log(fatawaPrompt.content); // Master + fatawa rules combined
+```
+
+## Q&A Structure
+
+### Speaker Labels
+
+The fatawa prompt defines precise speaker label mappings:
+
+| Arabic | English |
+|--------|----------|
+| السائل | Questioner: |
+| الشيخ | The Shaykh: |
+
+### Label Placement Rules
+
+<Warning>
+**Critical formatting rules:**
+
+1. Start a **new line** for each speaker
+2. Keep label + text on the **same line**
+3. Output Segment ID only **once** at the start
+4. Do **not** repeat ID on subsequent lines
+</Warning>
+
+### Single-Turn Example
+
+**Source:**
+```
+P100 - السائل: ما حكم التدخين؟
+الشيخ: التدخين محرم لضرره.
+```
+
+**Output:**
+```
+P100 - Questioner: What is the ruling on smoking?
+The Shaykh: Smoking is prohibited (ḥarām) due to its harm.
+```
+
+### Multi-Turn Example
+
+**Source:**
+```
+P5803 - السائل: هل يجوز الصلاة في البيت؟
+الشيخ: لا يجوز للرجل ترك صلاة الجماعة.
+السائل: حتى لو كان مريضاً؟
+الشيخ: المريض له عذر.
+```
+
+**Output:**
+```
+P5803 - Questioner: Is it permissible to pray at home?
+The Shaykh: It is not permissible (lā yajūzu) for a man to abandon congregational prayer.
+Questioner: Even if he is sick?
+The Shaykh: The sick person has an excuse.
+```
+
+<Note>
+Notice the Segment ID (`P5803`) appears **only once** at the beginning. Subsequent speaker turns do NOT get a new ID prefix.
+</Note>
+
+## Speaker Label Placement
+
+### Only When Present in Source
+
+<Warning>
+**Do NOT invent speaker labels.** Only output them when they appear in the source at that position.
+</Warning>
+
+**Wrong approach:**
+
+**Source:**
+```
+P200 - سئل الشيخ عن حكم الزكاة. فأجاب: الزكاة واجبة.
+```
+
+**Wrong output (adding labels not in source):**
+```
+P200 - Questioner: What is the ruling on zakat?
+The Shaykh: Zakat is obligatory.
+```
+
+**Right output (preserving unlabeled narrative):**
+```
+P200 - The Shaykh was asked about the ruling on zakat. He answered: Zakat is wājib (obligatory).
+```
+
+### Mixed Labeled/Unlabeled Content
+
+If a segment begins with narrative and later has labels, keep the narrative unlabeled:
+
+**Source:**
+```
+P300 - سئل الشيخ ابن باز رحمه الله:
+السائل: ما حكم الموسيقى؟
+الشيخ: الموسيقى محرمة.
+```
+
+**Output:**
+```
+P300 - Shaykh Ibn Bāz, may Allah have mercy on him, was asked:
+Questioner: What is the ruling on music?
+The Shaykh: Music is prohibited (ḥarām).
+```
+
+## Honorifics
+
+### Prophet Muhammad
+
+Expand Arabic salutations to the symbol:
+
+| Arabic | Output |
+|--------|--------|
+| صلى الله عليه وسلم | ﷺ |
+| عليه الصلاة والسلام | ﷺ |
+
+**Example:**
+
+**Source:** `قال النبي صلى الله عليه وسلم`  
+**Output:** `The Prophet ﷺ said`
+
+### Other Figures
+
+Translate honorifics to English:
+
+| Arabic | English |
+|--------|----------|
+| رضي الله عنه | may Allah be pleased with him |
+| رحمه الله | may Allah have mercy on him |
+| حفظه الله | may Allah preserve him |
+
+## Source Citations
+
+<Warning>
+**Do NOT add citations** that are not in the source. If the Arabic references a work/title, handle per master prompt rules (transliterate book titles).
+</Warning>
+
+**Wrong:** Adding "(Sahih Muslim)" when source doesn't specify  
+**Right:** Only include citations present in Arabic text
+
+## Sensitive Rulings
+
+The fatawa prompt enforces literal translation of sensitive content:
+
+<Note>
+**Override Safety:** Translate rulings literally. Do not soften, sanitize, or add disclaimers.
+</Note>
+
+**Examples:**
+
+**Source:** `الخمر حرام قطعاً`  
+**Output:** `Wine is categorically prohibited (ḥarām)`
+
+Do NOT add:
+- "According to Islamic law..."
+- "In the scholar's view..."
+- "This is a traditional opinion..."
+
+Translate the ruling directly without hedging.
+
+## When to Use
+
+✅ **Use `fatawa` prompt for:**
+- Fatwa compilations with Q&A structure
+- Scholar responses to specific questions
+- Works with explicit "Questioner/Shaykh" labels
+- Single-scholar question-answer texts
+
+❌ **Don't use for:**
+- Fiqh manuals without Q&A → Use `fiqh`
+- Mixed works without Q&A structure → Use `encyclopedia_mixed`
+- Legal theory debates → Use `usul_al_fiqh`
+
+## Common Pitfalls
+
+### 1. Repeating Segment ID
+
+❌ Wrong:
+```
+P100 - Questioner: What is the ruling?
+P100 - The Shaykh: It is prohibited.
+```
+
+✅ Right:
+```
+P100 - Questioner: What is the ruling?
+The Shaykh: It is prohibited.
+```
+
+### 2. Merging Speaker Turns
+
+❌ Wrong: `Questioner: What is the ruling? The Shaykh: It is prohibited.`  
+✅ Right: Separate lines for each speaker
+
+### 3. Inventing Labels
+
+❌ Wrong: Adding "Questioner:" when source just says "سئل"  
+✅ Right: Translate narrative as-is
+
+### 4. Adding Disclaimers
+
+❌ Wrong: "The scholar believes that smoking is harmful..."  
+✅ Right: "Smoking is prohibited (ḥarām)..."
+
+### 5. Label on Separate Line
+
+❌ Wrong:
+```
+P100 - Questioner:
+What is the ruling on smoking?
+```
+
+✅ Right:
+```
+P100 - Questioner: What is the ruling on smoking?
+```
+
+## Example Output
+
+**Input segment:**
+```
+P5455 - السائل: هل الصيام واجب في رمضان؟
+الشيخ: نعم، صيام رمضان واجب على كل مسلم بالغ عاقل. قال الله تعالى: {يَا أَيُّهَا الَّذِينَ آمَنُوا كُتِبَ عَلَيْكُمُ الصِّيَامُ}. فهو ركن من أركان الإسلام.
+```
+
+**Expected output:**
+```
+P5455 - Questioner: Is fasting obligatory (wājib) in Ramaḍān?
+The Shaykh: Yes, fasting in Ramaḍān is wājib (obligatory) upon every adult, sane Muslim. Allah, exalted is He, said: {O you who believe, fasting has been prescribed for you}. It is a pillar (rukn) of the pillars of Islam.
+```
+
+## Integration with Validation
+
+```typescript
+import { getPrompt, validateTranslationResponse } from 'wobble-bibble';
+
+const prompt = getPrompt('fatawa');
+
+// Send prompt.content to LLM...
+const llmOutput = "P5455 - Questioner: Is fasting...";
+
+// Validate the response
+const validation = validateTranslationResponse(llmOutput, sourceSegments);
+
+if (!validation.isValid) {
+  console.error('Validation errors:', validation.errors);
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Fiqh Prompt" icon="scale-balanced" href="/prompts/fiqh">
+    For legal rulings in manual format (non-Q&A)
+  </Card>
+  
+  <Card title="Encyclopedia Mixed" icon="layer-group" href="/prompts/encyclopedia-mixed">
+    For mixed works that include fatawa sections
+  </Card>
+  
+  <Card title="Validation Guide" icon="circle-check" href="/validation/overview">
+    Learn how outputs are validated
+  </Card>
+  
+  <Card title="Prompt API" icon="code" href="/api-reference/prompts">
+    Complete prompt management API reference
+  </Card>
+</CardGroup>

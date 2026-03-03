@@ -1,0 +1,440 @@
+---
+title: VALIDATION_ERROR_TYPE_INFO
+description: Human-readable descriptions for each ValidationErrorType, intended for client UIs and logs
+---
+
+## Constant Definition
+
+```typescript
+export const VALIDATION_ERROR_TYPE_INFO = {
+    all_caps: { description: string },
+    arabic_leak: { description: string },
+    collapsed_speakers: { description: string },
+    duplicate_id: { description: string },
+    empty_parentheses: { description: string },
+    invalid_marker_format: { description: string },
+    invented_id: { description: string },
+    length_mismatch: { description: string },
+    missing_id_gap: { description: string },
+    multiword_translit_without_gloss: { description: string },
+    newline_after_id: { description: string },
+    no_valid_markers: { description: string },
+    truncated_segment: { description: string },
+} as const satisfies Record<ValidationErrorType, { description: string }>
+```
+
+Provides human-readable descriptions for each `ValidationErrorType` value. Use this constant to display error explanations in UIs or logs.
+
+## Error Type Descriptions
+
+### `all_caps`
+
+<ResponseField name="description" type="string">
+  ALL CAPS "shouting" detected (run of N uppercase words).
+</ResponseField>
+
+Detects when multiple consecutive words are in ALL CAPS, which often indicates shouting or improper formatting. The threshold is configurable via `ValidationConfig.allCapsWordRunThreshold` (default: 5 words).
+
+**Example error:**
+```typescript
+// Input: "P1 - THIS IS VERY VERY LOUD"
+VALIDATION_ERROR_TYPE_INFO.all_caps.description
+// "ALL CAPS \"shouting\" detected (run of N uppercase words)."
+```
+
+### `arabic_leak`
+
+<ResponseField name="description" type="string">
+  Arabic script was detected in output (except ﷺ).
+</ResponseField>
+
+Detects any Arabic script characters in the translation output. The symbol ﷺ (peace be upon him) is explicitly allowed and will not trigger this error.
+
+**Example error:**
+```typescript
+// Input: "P1 - He quoted «واللاتي تخافون نشوزهن»."
+VALIDATION_ERROR_TYPE_INFO.arabic_leak.description
+// "Arabic script was detected in output (except ﷺ)."
+```
+
+**Error object example:**
+```typescript
+{
+  type: 'arabic_leak',
+  message: 'Arabic script detected: "واللاتي تخافون نشوزهن"',
+  matchText: 'واللاتي تخافون نشوزهن',
+  range: { start: 17, end: 41 },
+  id: 'P1'
+}
+```
+
+### `collapsed_speakers`
+
+<ResponseField name="description" type="string">
+  Speaker labels appear mid-line instead of starting on a new line.
+</ResponseField>
+
+Detects when speaker labels (e.g., "Questioner:", "The Shaykh:") appear in the middle of a line instead of at the start. This rule uses the translation's own line-start labels as the reference set.
+
+**Example error:**
+```typescript
+// Input: "P1 - Questioner: Yes.\nThe Shaykh: Yes. Questioner: Yes."
+//                                                 ^^^ collapsed here
+VALIDATION_ERROR_TYPE_INFO.collapsed_speakers.description
+// "Speaker labels appear mid-line instead of starting on a new line."
+```
+
+**Error object example:**
+```typescript
+{
+  type: 'collapsed_speakers',
+  message: 'Collapsed speaker label detected in "P1": "Questioner:" should start on a new line. Detected line-start labels: Questioner, The Shaykh',
+  matchText: 'Questioner:',
+  range: { start: 48, end: 59 },
+  id: 'P1'
+}
+```
+
+### `duplicate_id`
+
+<ResponseField name="description" type="string">
+  The same segment ID appears more than once in the response.
+</ResponseField>
+
+Detects when a segment ID is used multiple times in the translation output.
+
+**Example error:**
+```typescript
+// Input: "P1 - First.\nP1 - Second."
+VALIDATION_ERROR_TYPE_INFO.duplicate_id.description
+// "The same segment ID appears more than once in the response."
+```
+
+**Error object example:**
+```typescript
+{
+  type: 'duplicate_id',
+  message: 'Duplicate ID "P1" detected - each segment should appear only once',
+  matchText: 'P1 - ',
+  range: { start: 12, end: 17 },
+  id: 'P1'
+}
+```
+
+### `empty_parentheses`
+
+<ResponseField name="description" type="string">
+  Excessive "()" patterns detected, often indicating failed/empty term-pairs.
+</ResponseField>
+
+Detects when more than 3 empty parentheses `()` appear in the response, which usually indicates failed transliterations where the LLM omitted the content.
+
+**Example error:**
+```typescript
+// Input: "P1 - One () two () three () four () five ()."
+VALIDATION_ERROR_TYPE_INFO.empty_parentheses.description
+// "Excessive \"()\" patterns detected, often indicating failed/empty term-pairs."
+```
+
+**Error object example:**
+```typescript
+{
+  type: 'empty_parentheses',
+  message: 'Found 5 empty parentheses "()" - this usually indicates failed transliterations. Please check if the LLM omitted Arabic/transliterated terms.',
+  matchText: '()',
+  range: { start: 9, end: 11 },
+}
+```
+
+### `invalid_marker_format`
+
+<ResponseField name="description" type="string">
+  A segment marker line is malformed (e.g., wrong ID shape or missing content after the dash).
+</ResponseField>
+
+Detects various malformed marker patterns:
+- Wrong ID shape (e.g., `B12a34 -` instead of `B1234a -`)
+- Dollar signs in IDs (e.g., `B1234$5 -`)
+- Missing content after dash (e.g., `P1 -   `)
+- Suspicious spacing patterns
+
+**Example errors:**
+```typescript
+// Input: "B12a34 - Invalid"
+VALIDATION_ERROR_TYPE_INFO.invalid_marker_format.description
+// "A segment marker line is malformed (e.g., wrong ID shape or missing content after the dash)."
+```
+
+**Error object examples:**
+```typescript
+// Wrong ID format
+{
+  type: 'invalid_marker_format',
+  message: 'Invalid reference format "B12a34 -" - expected format is letter + numbers + optional suffix (a-j) + dash',
+  matchText: 'B12a34 - ',
+  range: { start: 0, end: 9 }
+}
+
+// Dollar sign
+{
+  type: 'invalid_marker_format',
+  message: 'Invalid reference format "B1234$5" - contains $ character',
+  matchText: 'B1234$5',
+  range: { start: 0, end: 7 }
+}
+
+// Empty after dash
+{
+  type: 'invalid_marker_format',
+  message: 'Reference "P1 -" has dash but no content after it',
+  matchText: 'P1 -   ',
+  range: { start: 0, end: 7 }
+}
+```
+
+### `invented_id`
+
+<ResponseField name="description" type="string">
+  The response contains a segment ID that does not exist in the provided source corpus.
+</ResponseField>
+
+Detects when the translation output references a segment ID that doesn't exist in the source segments array.
+
+**Example error:**
+```typescript
+// Source: [{ id: 'P1', text: 'نص' }]
+// Input: "P1 - Valid.\nP2 - Invented."
+VALIDATION_ERROR_TYPE_INFO.invented_id.description
+// "The response contains a segment ID that does not exist in the provided source corpus."
+```
+
+**Error object example:**
+```typescript
+{
+  type: 'invented_id',
+  message: 'Invented ID detected: "P2" - this ID does not exist in the source',
+  matchText: 'P2 - ',
+  range: { start: 15, end: 20 },
+  id: 'P2'
+}
+```
+
+### `length_mismatch`
+
+<ResponseField name="description" type="string">
+  Translation appears too short relative to Arabic source (heuristic truncation check).
+</ResponseField>
+
+Detects when a translation is suspiciously short compared to the Arabic source text. Uses a ratio-based heuristic and only applies to Arabic text ≥ 100 characters.
+
+**Example error:**
+```typescript
+// Source: { id: 'P1', text: '(100+ chars of Arabic)' }
+// Input: "P1 - Short."
+VALIDATION_ERROR_TYPE_INFO.length_mismatch.description
+// "Translation appears too short relative to Arabic source (heuristic truncation check)."
+```
+
+**Error object example:**
+```typescript
+{
+  type: 'length_mismatch',
+  message: 'Translation for "P1" appears truncated: 6 chars for 115 char Arabic text (expected at least ~34 chars)',
+  matchText: 'Short.',
+  range: { start: 5, end: 11 },
+  id: 'P1'
+}
+```
+
+### `missing_id_gap`
+
+<ResponseField name="description" type="string">
+  A gap was detected: the response includes two IDs whose corpus order implies one or more intermediate IDs are missing.
+</ResponseField>
+
+Detects when the response translates segments in order but skips intermediate segments. For example, translating P1 and P3 but omitting P2 (when the corpus order is P1, P2, P3).
+
+Note: This only detects gaps between consecutive IDs in the response. If the response order "resets" (e.g., P3 then P1), no gap is reported.
+
+**Example error:**
+```typescript
+// Source: [P1, P2, P3]
+// Input: "P1 - Text.\nP3 - Text."  // P2 is missing
+VALIDATION_ERROR_TYPE_INFO.missing_id_gap.description
+// "A gap was detected: the response includes two IDs whose corpus order implies one or more intermediate IDs are missing."
+```
+
+**Error object example:**
+```typescript
+{
+  type: 'missing_id_gap',
+  message: 'Missing segment ID detected between translated IDs: "P2"',
+  matchText: 'P3 - ',
+  range: { start: 12, end: 17 },
+  id: 'P2'
+}
+```
+
+### `multiword_translit_without_gloss`
+
+<ResponseField name="description" type="string">
+  A multi-word transliteration phrase was detected without an immediate parenthetical gloss.
+</ResponseField>
+
+Detects multi-word transliteration patterns (specifically `al-... fi al-...`) that appear without an immediate parenthetical English gloss within 25 characters.
+
+**Example error:**
+```typescript
+// Input: "P1 - He advised al-hajr fi al-madajīʿ."
+VALIDATION_ERROR_TYPE_INFO.multiword_translit_without_gloss.description
+// "A multi-word transliteration phrase was detected without an immediate parenthetical gloss."
+```
+
+**Error object example:**
+```typescript
+{
+  type: 'multiword_translit_without_gloss',
+  message: 'Multi-word transliteration without immediate gloss in "P1": "al-hajr fi al-madajīʿ"',
+  matchText: 'al-hajr fi al-madajīʿ',
+  range: { start: 16, end: 37 },
+  id: 'P1'
+}
+
+// With gloss (no error):
+// "P1 - He advised al-hajr fi al-madajīʿ (marital bed abandonment)."
+```
+
+### `newline_after_id`
+
+<ResponseField name="description" type="string">
+  The response used "ID -\nText" instead of "ID - Text" (newline immediately after the marker).
+</ResponseField>
+
+Detects when a segment marker has a newline immediately after the dash, which is a formatting error.
+
+**Example error:**
+```typescript
+// Input: "P1 -\nText"
+VALIDATION_ERROR_TYPE_INFO.newline_after_id.description
+// "The response used \"ID -\\nText\" instead of \"ID - Text\" (newline immediately after the marker)."
+```
+
+**Error object example:**
+```typescript
+{
+  type: 'newline_after_id',
+  message: 'Invalid format: newline after ID "P1 -" - use "ID - Text" format',
+  matchText: 'P1 -\n',
+  range: { start: 0, end: 5 }
+}
+```
+
+### `no_valid_markers`
+
+<ResponseField name="description" type="string">
+  No valid "ID - ..." markers were found anywhere in the response.
+</ResponseField>
+
+Detects when the entire response contains no valid segment markers at all.
+
+**Example error:**
+```typescript
+// Input: "Just some text without markers"
+VALIDATION_ERROR_TYPE_INFO.no_valid_markers.description
+// "No valid \"ID - ...\" markers were found anywhere in the response."
+```
+
+**Error object example:**
+```typescript
+{
+  type: 'no_valid_markers',
+  message: 'No valid translation markers found',
+  matchText: 'Just some text without markers',
+  range: { start: 0, end: 30 },
+  ruleId: 'no_valid_markers'
+}
+```
+
+### `truncated_segment`
+
+<ResponseField name="description" type="string">
+  A segment appears truncated (e.g., only "…", "...", or "[INCOMPLETE]").
+</ResponseField>
+
+Detects segments that contain only truncation markers instead of actual translations. Recognizes:
+- `…` (ellipsis character)
+- `...` (three periods)
+- `[INCOMPLETE]`
+- Empty content
+
+Note: If the source Arabic segment itself is only an ellipsis, this error is not triggered.
+
+**Example error:**
+```typescript
+// Input: "P1 - …\nP2 - ...\nP3 - [INCOMPLETE]"
+VALIDATION_ERROR_TYPE_INFO.truncated_segment.description
+// "A segment appears truncated (e.g., only \"…\", \"...\", or \"[INCOMPLETE]\")."
+```
+
+**Error object example:**
+```typescript
+{
+  type: 'truncated_segment',
+  message: 'Truncated segment detected: "P1" - segments must be fully translated',
+  matchText: '…',
+  range: { start: 5, end: 6 },
+  id: 'P1'
+}
+```
+
+## Usage Example
+
+```typescript
+import { validateTranslationResponse, VALIDATION_ERROR_TYPE_INFO } from 'wobble-bibble';
+
+const segments = [{ id: 'P1', text: 'نص عربي' }];
+const response = 'P1 - He said الله.';
+
+const result = validateTranslationResponse(segments, response);
+
+for (const error of result.errors) {
+  console.log(`Error: ${error.type}`);
+  console.log(`Description: ${VALIDATION_ERROR_TYPE_INFO[error.type].description}`);
+  console.log(`Message: ${error.message}`);
+  console.log(`Match: "${error.matchText}"`);
+  console.log(`Range: ${error.range.start}-${error.range.end}`);
+}
+
+// Output:
+// Error: arabic_leak
+// Description: Arabic script was detected in output (except ﷺ).
+// Message: Arabic script detected: "الله"
+// Match: "الله"
+// Range: 13-17
+```
+
+## All ValidationErrorType Values
+
+The complete set of error types:
+
+```typescript
+type ValidationErrorType =
+  | 'invalid_marker_format'
+  | 'no_valid_markers'
+  | 'newline_after_id'
+  | 'duplicate_id'
+  | 'invented_id'
+  | 'missing_id_gap'
+  | 'collapsed_speakers'
+  | 'truncated_segment'
+  | 'arabic_leak'
+  | 'empty_parentheses'
+  | 'length_mismatch'
+  | 'all_caps'
+  | 'multiword_translit_without_gloss'
+```
+
+## See Also
+
+- [validateTranslationResponse](/api/validation/validate-translation-response) - Main validation function
+- [ValidationError](/api/types/validation-error) - Error object structure

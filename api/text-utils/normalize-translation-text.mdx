@@ -1,0 +1,91 @@
+---
+title: normalizeTranslationText
+description: Normalize line endings and split merged markers onto separate lines
+---
+
+## Overview
+
+Normalizes translation text by standardizing line endings and ensuring translation markers appear on their own lines. This is essential for reliable parsing of LLM translation responses.
+
+## Function Signature
+
+```typescript
+normalizeTranslationText(content: string): string
+```
+
+## Parameters
+
+<ParamField path="content" type="string" required>
+  Raw translation text that may contain inconsistent line endings or merged markers.
+</ParamField>
+
+## Returns
+
+<ResponseField name="normalized" type="string">
+  Normalized text with standardized line endings and properly separated translation markers.
+</ResponseField>
+
+## Usage
+
+### Basic Example
+
+```typescript
+import { normalizeTranslationText } from 'wobble-bibble';
+
+const rawResponse = 'P1 - Hello worldP2 - Goodbye';
+const normalized = normalizeTranslationText(rawResponse);
+
+console.log(normalized);
+// Output:
+// P1 - Hello world
+// P2 - Goodbye
+```
+
+### Handling Line Ending Variations
+
+```typescript
+// Handles \r\n (Windows), \r (old Mac), and \n (Unix)
+const windowsText = 'P1 - First\r\nP2 - Second';
+const normalized = normalizeTranslationText(windowsText);
+
+console.log(normalized.includes('\n')); // true
+console.log(normalized.includes('\r')); // false
+```
+
+### Splitting Merged Markers
+
+```typescript
+// When markers are accidentally concatenated
+const merged = 'helloP1 - translation text';
+const normalized = normalizeTranslationText(merged);
+
+console.log(normalized.includes('\nP1 -')); // true
+```
+
+## What It Does
+
+The normalization process performs several operations:
+
+1. **Line Ending Normalization**: Converts all line endings (\r\n, \r) to \n
+2. **Merged Marker Splitting**: Inserts newlines before markers that are merged with preceding text
+   - `helloP1 - text` → `hello\nP1 - text`
+   - `word P2 - text` → `word\nP2 - text`
+
+3. **Escaped Bracket Handling**: Removes backslash escaping from `\[` → `[`
+
+## When to Use
+
+Use `normalizeTranslationText` when:
+
+- Processing raw LLM translation responses before parsing
+- Preparing text for ID extraction or translation parsing
+- Handling text from different platforms with varying line endings
+- Ensuring consistent marker formatting across inputs
+
+This function is a prerequisite for most other text utility functions like `parseTranslations` and `extractTranslationIds`, which expect properly normalized input.
+
+## Related Functions
+
+- [`normalizeTranslationTextWithMap`](/api/text-utils/normalize-translation-text-with-map) - Returns normalized text with character position mapping
+- [`extractTranslationIds`](/api/text-utils/extract-translation-ids) - Extract IDs from normalized text
+- [`parseTranslations`](/api/text-utils/parse-translations) - Parse normalized text into a Map

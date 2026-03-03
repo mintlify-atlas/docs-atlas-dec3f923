@@ -1,0 +1,69 @@
+---
+title: formatExcerptsForPrompt
+description: Format segments for LLM prompts by combining instruction text with segment data
+---
+
+## Overview
+
+Formats an array of segments for an LLM prompt by combining the system/instruction prompt with formatted segment text. Each segment is formatted as "ID - Text" and separated by double newlines.
+
+## Function Signature
+
+```typescript
+formatExcerptsForPrompt(segments: Segment[], prompt: string): string
+```
+
+## Parameters
+
+<ParamField path="segments" type="Segment[]" required>
+  Array of segments to format. Each segment must have an `id` and `text` property.
+</ParamField>
+
+<ParamField path="prompt" type="string" required>
+  The instruction or system prompt to prepend to the formatted segments.
+</ParamField>
+
+## Returns
+
+<ResponseField name="result" type="string">
+  Combined string with the prompt prepended, followed by double newline, then all segments formatted as "ID - Text" and separated by double newlines.
+</ResponseField>
+
+## Usage
+
+### Basic Example
+
+```typescript
+import { formatExcerptsForPrompt } from 'wobble-bibble';
+
+const segments = [
+  { id: 'P1', text: 'الله أكبر' },
+  { id: 'P2', text: 'بسم الله الرحمن الرحيم' }
+];
+
+const prompt = 'Translate the following Arabic text to English:';
+
+const formatted = formatExcerptsForPrompt(segments, prompt);
+console.log(formatted);
+```
+
+### Output
+
+```text
+Translate the following Arabic text to English:
+
+P1 - الله أكبر
+
+P2 - بسم الله الرحمن الرحيم
+```
+
+## When to Use
+
+Use `formatExcerptsForPrompt` when:
+
+- Preparing text segments for LLM translation requests
+- Building prompts that need to maintain segment ID tracking
+- Creating structured input for batch translation operations
+- Combining system instructions with source material
+
+This function ensures consistent formatting across all LLM requests, making it easier to parse responses and maintain ID integrity throughout the translation pipeline.

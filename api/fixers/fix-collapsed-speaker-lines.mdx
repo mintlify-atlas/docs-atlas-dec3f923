@@ -1,0 +1,247 @@
+---
+title: 'fixCollapsedSpeakerLines'
+description: 'Fix speaker dialogue lines that were incorrectly merged onto the same line'
+---
+
+Fixes collapsed speaker lines by inserting newlines before mid-line speaker labels. This corrects a common LLM error where dialogue turns are merged onto one line instead of being separated.
+
+## Function Signature
+
+```typescript
+fixCollapsedSpeakerLines(text: string, config?: FixConfig): FixResult
+```
+
+## Parameters
+
+<ParamField path="text" type="string" required>
+  The translation text to fix. Should contain speaker-labeled dialogue (e.g., Q&A format, fatwa exchanges).
+</ParamField>
+
+<ParamField path="config" type="FixConfig">
+  Optional configuration for the fixer.
+  
+  <Expandable title="FixConfig">
+    <ParamField path="speakerLabels" type="string[]">
+      Speaker labels to recognize when fixing collapsed lines.
+      
+      If not provided, the function will automatically infer labels from the text by finding capitalized words followed by colons that appear 2+ times.
+      
+      **Auto-inference pattern**: Matches 1-3 capitalized words ending with a colon (e.g., `"Questioner:"`, `"The Shaykh:"`, `"Shaykh Ibn Bāz:"`)
+      
+      Example: `["Questioner", "The Shaykh", "Mu'adhdhin"]`
+    </ParamField>
+    
+    <ParamField path="leadingPunctuation" type="string[]">
+      Punctuation tokens that may appear before a collapsed speaker label.
+      
+      When inserting a newline before a speaker label, the function preserves trailing punctuation from the previous sentence.
+      
+      **Default**: `['.', '?', '!', '…', '،', '؛', ':', '：', '-', '–', '—']`
+      
+      Example: `"The ruling is permissible. The Shaykh: Another point..."` becomes:
+      ```
+      The ruling is permissible.
+      The Shaykh: Another point...
+      ```
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Return Value
+
+<ResponseField name="FixResult" type="object">
+  Object containing the fixed text and metadata.
+  
+  <Expandable title="Properties">
+    <ResponseField name="text" type="string">
+      The corrected text with newlines inserted before mid-line speaker labels.
+    </ResponseField>
+    
+    <ResponseField name="applied" type="string[]">
+      Array containing `['fixCollapsedSpeakerLines']` if any fixes were applied, otherwise empty array `[]`.
+    </ResponseField>
+    
+    <ResponseField name="counts" type="Record<string, number>">
+      Object with a single key `fixCollapsedSpeakerLines` containing the number of fixes applied.
+      
+      Example: `{ fixCollapsedSpeakerLines: 3 }`
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+### Basic Usage
+
+```typescript
+import { fixCollapsedSpeakerLines } from 'wobble-bibble';
+
+const malformed = `P1 - Questioner: What is the ruling? The Shaykh: The ruling is permissible.`;
+
+const result = fixCollapsedSpeakerLines(malformed, {
+  speakerLabels: ['Questioner', 'The Shaykh']
+});
+
+console.log(result.text);
+// P1 - Questioner: What is the ruling?
+// The Shaykh: The ruling is permissible.
+
+console.log(result.counts);
+// { fixCollapsedSpeakerLines: 1 }
+```
+
+### Auto-Inference of Speaker Labels
+
+```typescript
+const text = `
+P1 - Questioner: First question?
+P2 - The Shaykh: First answer. Questioner: Follow-up question?
+P3 - The Shaykh: Final answer.
+`;
+
+// No config provided - labels will be inferred
+const result = fixCollapsedSpeakerLines(text);
+
+console.log(result.text);
+// P1 - Questioner: First question?
+// P2 - The Shaykh: First answer.
+// Questioner: Follow-up question?
+// P3 - The Shaykh: Final answer.
+```
+
+### Punctuation Preservation
+
+```typescript
+const text = `P1 - The answer is yes. The Shaykh: However, there are conditions.`;
+
+const result = fixCollapsedSpeakerLines(text, {
+  speakerLabels: ['The Shaykh'],
+  leadingPunctuation: ['.', '?', '!']
+});
+
+console.log(result.text);
+// P1 - The answer is yes.
+// The Shaykh: However, there are conditions.
+// Note: The period is preserved before the newline
+```
+
+### Multiple Collapses on One Line
+
+```typescript
+const text = `P1 - Questioner: Question one? The Shaykh: Answer one. Questioner: Question two?`;
+
+const result = fixCollapsedSpeakerLines(text, {
+  speakerLabels: ['Questioner', 'The Shaykh']
+});
+
+console.log(result.text);
+// P1 - Questioner: Question one?
+// The Shaykh: Answer one.
+// Questioner: Question two?
+
+console.log(result.counts);
+// { fixCollapsedSpeakerLines: 2 }
+```
+
+### No Fixes Needed
+
+```typescript
+const wellFormatted = `
+P1 - Questioner: What is the ruling?
+P2 - The Shaykh: The ruling is permissible.
+`;
+
+const result = fixCollapsedSpeakerLines(wellFormatted);
+
+console.log(result.applied);
+// []
+
+console.log(result.counts);
+// { fixCollapsedSpeakerLines: 0 }
+
+console.log(result.text === wellFormatted);
+// true (text unchanged)
+```
+
+## Behavior Details
+
+### Label Detection
+
+The function only inserts newlines before labels that appear **mid-line** (not at the start of a line):
+
+```typescript
+const text = `Questioner: This is fine. The Shaykh: This needs fixing.`;
+//            ^^^^^^^^^^^ already at line start - ignored
+//                                      ^^^^^^^^^^^ mid-line - fixed
+```
+
+### Segment ID Preservation
+
+The function preserves segment IDs and only processes the text after the ID:
+
+```typescript
+const text = `P123 - Questioner: Text here. The Shaykh: More text.`;
+//            ^^^^^^^ preserved as-is
+```
+
+### Empty Label List Handling
+
+If no speaker labels are found (either provided or inferred), the function returns the original text unchanged:
+
+```typescript
+const text = `P1 - Some text without any speaker labels.`;
+
+const result = fixCollapsedSpeakerLines(text);
+// No labels found, nothing to fix
+
+console.log(result.text === text);
+// true
+
+console.log(result.counts);
+// { fixCollapsedSpeakerLines: 0 }
+```
+
+### Trailing Whitespace Handling
+
+When inserting newlines, trailing whitespace before the label is removed:
+
+```typescript
+const text = `P1 - Answer.    The Shaykh: Text.`;
+//                      ^^^^ extra spaces removed
+
+const result = fixCollapsedSpeakerLines(text, {
+  speakerLabels: ['The Shaykh']
+});
+
+console.log(result.text);
+// P1 - Answer.
+// The Shaykh: Text.
+```
+
+## Validation Error Type
+
+This fixer corresponds to the `collapsed_speakers` validation error type:
+
+```typescript
+import { validateTranslation, fixAll } from 'wobble-bibble';
+
+// 1. Validate to detect the error
+const validation = validateTranslation(llmOutput, segments, config);
+const hasCollapsed = validation.errors.some(e => e.type === 'collapsed_speakers');
+
+// 2. Fix if detected
+if (hasCollapsed) {
+  const fixed = fixAll(llmOutput, {
+    types: ['collapsed_speakers'],
+    config: { speakerLabels: ['Questioner', 'The Shaykh'] }
+  });
+  console.log(fixed.text);
+}
+```
+
+## Related
+
+- [fixAll](/api/fixers/fix-all) - Apply multiple fixers in sequence
+- [FixConfig](/api/types/fix-config) - Configuration type definition
+- [FixResult](/api/types/fix-result) - Return type definition
+- [VALIDATION_ERROR_TYPE_INFO](/api/validation/validation-error-type-info) - All error types that can be detected

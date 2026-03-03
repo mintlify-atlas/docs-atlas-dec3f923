@@ -1,0 +1,275 @@
+---
+title: "Fiqh Prompt"
+description: "For translating Islamic jurisprudence texts with legal rulings and technical terminology"
+---
+
+The fiqh prompt is specialized for translating **Islamic jurisprudence** (fiqh) texts - legal manuals, rulings, and scholarly disagreements on ritual and transactional matters.
+
+## What It's For
+
+Use the fiqh prompt when translating:
+
+- Fiqh manuals (Hidayah, Mughni, Umm, etc.)
+- Legal rulings on worship, contracts, and criminal law
+- Texts with madhab disagreements and attributions
+- Works using the five-fold legal categorization
+
+<Note>
+The fiqh prompt is **automatically stacked** on top of the master prompt. You get all master rules plus fiqh-specific guidance.
+</Note>
+
+## Access the Fiqh Prompt
+
+```typescript
+import { getPrompt } from 'wobble-bibble';
+
+const fiqhPrompt = getPrompt('fiqh');
+console.log(fiqhPrompt.name); // "Fiqh"
+console.log(fiqhPrompt.content); // Master + fiqh rules combined
+```
+
+## Structure Preservation
+
+The fiqh prompt preserves hierarchical structure using plain English labels:
+
+| Arabic | English Label | Usage |
+|--------|---------------|-------|
+| باب | Chapter: | Main divisions |
+| فصل | Section: | Subsections |
+| مسألة | Issue: | Individual rulings |
+| فرع | Branch: | Derived cases |
+| أصل | Root: | Fundamental principles |
+
+<Warning>
+Only use these labels when the Arabic **explicitly** contains a structural heading. Do not insert labels into narrative text.
+</Warning>
+
+### Example
+
+**Source:**
+```
+باب الطهارة
+مسألة: الماء الطاهر ينقسم إلى قسمين
+```
+
+**Output:**
+```
+Chapter: Purification
+Issue: Pure water is divided into two categories
+```
+
+## Legal Categorization (Five-Fold Scale)
+
+Use `translit (English)` format for legal rulings:
+
+| Arabic | Transliteration | English | Category |
+|--------|-----------------|---------|----------|
+| واجب | wājib | obligatory | Mandatory |
+| مندوب / مستحب | mandūb / mustaḥabb | recommended | Encouraged |
+| مباح | mubāḥ | permissible | Neutral |
+| مكروه | makrūh | disliked | Discouraged |
+| حرام | ḥarām | prohibited | Forbidden |
+
+### Example
+
+**Wrong:** "Prayer is obligatory"  
+**Right:** "Prayer is wājib (obligatory)"
+
+## Validity Terminology
+
+| Arabic | Transliteration | English |
+|--------|-----------------|----------|
+| صحيح | ṣaḥīḥ | valid |
+| باطل | bāṭil | invalid/void |
+| فاسد | fāsid | invalid/void |
+
+<Note>
+**Context matters:** In hadith, ṣaḥīḥ means "authentic." In fiqh, it means "valid." The fiqh prompt uses the legal sense.
+</Note>
+
+## Fiqh Technical Terms
+
+Always define technical terms on first occurrence:
+
+### Foundational Concepts
+
+- `rukn (pillar)` - Essential component
+- `shart (condition)` - Precondition for validity
+- `māniʿ (preventer)` - Invalidating factor
+- `sabab (cause)` - Legal cause
+- `ʿillah (effective cause)` - Ratio legis
+
+### Reasoning Methods
+
+- `qiyās (analogical reasoning)` - Analogy
+- `ijmāʿ (consensus)` - Scholarly agreement
+- `khilāf (disagreement)` - Scholarly dispute
+
+### Opinion Strength
+
+- `rājiḥ (preponderant)` - Stronger opinion
+- `marjūḥ (lesser)` - Weaker opinion
+- `al-aṣaḥḥ` - The soundest view
+
+## Madhab Attribution
+
+Preserve attributions exactly as written:
+
+### Common Patterns
+
+- `qāla fulān` - So-and-so said
+- `qawl` - Opinion/view
+- `wajhān` - Two positions
+- `riwāyātān` - Two reports
+- `madhhab` - School/position
+
+### Do Not Resolve Disputes
+
+<Warning>
+Unless the Arabic text explicitly chooses a view (using terms like al-rājiḥ or al-aṣaḥḥ), **do not** resolve the disagreement. Preserve all opinions.
+</Warning>
+
+**Example:**
+
+**Source:**
+```
+وفيه وجهان: أحدهما يجوز، والثاني لا يجوز. والأصح الأول.
+```
+
+**Output:**
+```
+There are two positions on this: The first is that it is permissible, and the second is that it is not permissible. The soundest is the first.
+```
+
+## Units and Currency
+
+Keep measures and monetary units as transliteration **without conversions**:
+
+| Arabic | Transliteration | Type |
+|--------|-----------------|------|
+| درهم | dirham | Currency |
+| دينار | dinar | Currency |
+| صاع | ṣāʿ | Volume |
+| مد | mudd | Volume |
+
+**Wrong:** "One dirham (approximately 3 grams of silver)"  
+**Right:** "One dirham"
+
+<Note>
+Only add conversions if the Arabic text itself provides them.
+</Note>
+
+## Conditional Logic
+
+Preserve if/then structures exactly:
+
+**Source:**
+```
+إن كان الماء قليلاً فهو نجس، وإن كان كثيراً فهو طاهر
+```
+
+**Output:**
+```
+If the water is little, it is impure; if it is abundant, it is pure
+```
+
+## Lists and Numbering
+
+Maintain original list structure:
+
+**Source:**
+```
+شروط الصلاة ثلاثة: الأول: الطهارة. الثاني: ستر العورة. الثالث: استقبال القبلة.
+```
+
+**Output:**
+```
+The conditions (shurūṭ) of prayer are three: First: Purification. Second: Covering the nakedness. Third: Facing the qiblah.
+```
+
+## When to Use
+
+✅ **Use `fiqh` prompt for:**
+- Pure fiqh manuals
+- Legal ruling compilations
+- Madhab-specific texts (Hanafi, Maliki, Shafi'i, Hanbali)
+- Comparative fiqh works
+
+❌ **Don't use for:**
+- Legal methodology (usul) → Use `usul_al_fiqh`
+- Fatwa Q&A format → Use `fatawa`
+- Mixed scholarly works → Use `encyclopedia_mixed`
+
+## Common Pitfalls
+
+### 1. English-only Legal Terms
+
+❌ Wrong: "Prayer is obligatory"  
+✅ Right: "Prayer is wājib (obligatory)"
+
+### 2. Adding Conversions
+
+❌ Wrong: "One ṣāʿ (approximately 2.6 liters)"  
+✅ Right: "One ṣāʿ"
+
+### 3. Resolving Unresolved Disputes
+
+❌ Wrong: "The correct view is..." (when source doesn't say this)  
+✅ Right: "There are two opinions: first... second..."
+
+### 4. Inventing Structure Labels
+
+❌ Wrong: Adding "Chapter:" when Arabic just has narrative text  
+✅ Right: Only use labels when Arabic has explicit structural markers
+
+## Example Output
+
+**Input segment:**
+```
+P456 - باب الوضوء
+مسألة: الوضوء واجب لكل صلاة. وشروطه ستة: النية، وغسل الوجه، وغسل اليدين، ومسح الرأس، وغسل الرجلين، والترتيب.
+```
+
+**Expected output:**
+```
+P456 - Chapter: Ablution
+Issue: Ablution is wājib (obligatory) for every prayer. Its conditions (shurūṭ) are six: Intention, washing the face, washing the hands, wiping the head, washing the feet, and sequential order.
+```
+
+## Integration with Validation
+
+```typescript
+import { getPrompt, validateTranslationResponse } from 'wobble-bibble';
+
+const prompt = getPrompt('fiqh');
+
+// Send prompt.content to LLM...
+const llmOutput = "P456 - Chapter: Ablution...";
+
+// Validate the response
+const validation = validateTranslationResponse(llmOutput, sourceSegments);
+
+if (!validation.isValid) {
+  console.error('Validation errors:', validation.errors);
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Usul al-Fiqh" icon="landmark" href="/prompts/usul-al-fiqh">
+    For legal methodology and theoretical jurisprudence
+  </Card>
+  
+  <Card title="Fatawa" icon="gavel" href="/prompts/fatawa">
+    For legal opinions in Q&A format
+  </Card>
+  
+  <Card title="Encyclopedia Mixed" icon="layer-group" href="/prompts/encyclopedia-mixed">
+    For works mixing fiqh with other genres
+  </Card>
+  
+  <Card title="Validation Guide" icon="circle-check" href="/validation/overview">
+    Learn how outputs are validated
+  </Card>
+</CardGroup>

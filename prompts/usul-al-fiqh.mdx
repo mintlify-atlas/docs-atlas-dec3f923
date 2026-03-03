@@ -1,0 +1,291 @@
+---
+title: "Usul al-Fiqh Prompt"
+description: "For legal theory texts with methodological disputes and epistemological arguments"
+---
+
+The usul al-fiqh prompt is specialized for translating **Islamic legal theory** (usul al-fiqh) - works on jurisprudential methodology, epistemology, and the principles underlying legal rulings.
+
+## What It's For
+
+Use the usul al-fiqh prompt when translating:
+
+- Legal theory manuals (Risalah, Mustasfa, Rawdah, etc.)
+- Texts on qiyas (analogical reasoning), ijma' (consensus), naskh (abrogation)
+- Works debating hermeneutical principles
+- Books with objection/reply structures
+- Methodological disputes between legal schools
+
+<Note>
+The usul al-fiqh prompt is **automatically stacked** on top of the master prompt. It extends fiqh rules with specialized epistemological terminology.
+</Note>
+
+## Access the Usul al-Fiqh Prompt
+
+```typescript
+import { getPrompt } from 'wobble-bibble';
+
+const usulPrompt = getPrompt('usul_al_fiqh');
+console.log(usulPrompt.name); // "Usul Al Fiqh"
+console.log(usulPrompt.content); // Master + usul rules combined
+```
+
+## Argument Structure Preservation
+
+Usul texts follow dialectical patterns. Preserve the structure:
+
+| Pattern | Arabic | English |
+|---------|--------|----------|
+| Claim | القول / الأصل | The position / The principle |
+| Objection | فإن قيل / إن قال قائل | If it is said / If someone says |
+| Reply | قلنا / فالجواب | We say / The answer is |
+| Evidence | الدليل / الحجة | The evidence / The proof |
+| Counter-evidence | الاعتراض | The objection |
+
+### Example
+
+**Source:**
+```
+فصل: الأمر يقتضي الوجوب.
+فإن قيل: قد يرد الأمر للندب.
+قلنا: الأصل في الأمر الوجوب إلا بقرينة.
+```
+
+**Output:**
+```
+Section: The command (amr) entails obligation.
+If it is said: The command may indicate recommendation.
+We say: The default for the command is obligation unless there is contextual evidence.
+```
+
+## Structural Labels
+
+Preserve explicit Arabic structural markers as plain English equivalents:
+
+| Arabic | English Label | Usage |
+|--------|---------------|-------|
+| فصل | Section: | Major divisions |
+| مسألة | Issue: | Individual questions |
+| قال | He said: | Quotations |
+| قيل | It was said: | Opposing views |
+| قلنا | We say: | Author's position |
+
+<Warning>
+**Only use labels when the Arabic explicitly contains them.** Do not insert structural markers into narrative text.
+</Warning>
+
+## Usul Technical Terms
+
+Always define technical terms on first occurrence using `translit (English)` format:
+
+### Linguistic Categories
+
+| Arabic | Transliteration | English |
+|--------|-----------------|----------|
+| عام | ʿāmm | general |
+| خاص | khāṣṣ | specific |
+| مطلق | muṭlaq | absolute |
+| مقيد | muqayyad | restricted |
+| أمر | amr | command |
+| نهي | nahy | prohibition |
+
+### Semantic Categories
+
+| Arabic | Transliteration | English |
+|--------|-----------------|----------|
+| حقيقة | ḥaqīqah | literal |
+| مجاز | majāz | figurative |
+| مجمل | mujmal | ambiguous |
+| مبيّن | mubayyan | clarified |
+| نص | naṣṣ | explicit text |
+| ظاهر | ẓāhir | apparent |
+
+### Implication Types
+
+| Arabic | Transliteration | English |
+|--------|-----------------|----------|
+| مفهوم | mafhūm | implication |
+| منطوق | manṭūq | stated meaning |
+| دلالة | dalālah | indication |
+| تنبيه | tanbīh | allusion |
+
+### Reasoning Methods
+
+| Arabic | Transliteration | English |
+|--------|-----------------|----------|
+| قياس | qiyās | analogical reasoning |
+| علة | ʿillah | effective cause |
+| سبب | sabab | cause |
+| شرط | shart | condition |
+| مانع | māniʿ | preventer |
+| إجماع | ijmāʿ | consensus |
+| نسخ | naskh | abrogation |
+
+### Example
+
+**Wrong:** "The command indicates obligation"  
+**Right:** "The amr (command) indicates obligation (wujūb)"
+
+## Dispute Handling
+
+Usul texts often present methodological disagreements between schools:
+
+### Do Not Resolve
+
+<Warning>
+Unless the Arabic text explicitly chooses a position (using terms like al-rājiḥ, al-aṣaḥḥ, or ṣaḥīḥ), **do not** resolve the dispute. Preserve all positions.
+</Warning>
+
+**Example:**
+
+**Source:**
+```
+اختلف العلماء: فقال الشافعي: الأمر للوجوب. وقال أبو حنيفة: قد يكون للندب.
+```
+
+**Output:**
+```
+The scholars disagreed: Al-Shāfiʿī said: The amr (command) is for obligation (wujūb). Abū Ḥanīfah said: It may be for recommendation (nadb).
+```
+
+### Attribution Preservation
+
+Maintain attributions to specific scholars or schools:
+
+- `قال الشافعي` → "Al-Shāfiʿī said"
+- `مذهب الحنفية` → "The madhhab of the Ḥanafīs"
+- `عند المالكية` → "According to the Mālikīs"
+
+## Quranic and Hadith References
+
+When usul texts cite Quran or hadith:
+
+### Verse References
+
+Keep the segment's citation style. Do not invent references:
+
+**Source:** `قال تعالى: {وأقيموا الصلاة}`  
+**Output:** `He, exalted is He, said: {And establish prayer}`
+
+If the source includes a verse number, preserve it. If not, don't add it.
+
+### Hadith Isnads
+
+If a hadith chain appears, follow **master prompt isnad rules**:
+
+- Full ALA-LC for narrator names
+- Translate transmission verbs (ḥaddathanā, akhbaranā, etc.)
+
+**Example:**
+
+**Source:**
+```
+روى البخاري عن ابن عمر أن النبي صلى الله عليه وسلم قال: "الأمور بمقاصدها"
+```
+
+**Output:**
+```
+Al-Bukhārī reported from Ibn ʿUmar that the Prophet ﷺ said: "Actions are by intentions."
+```
+
+## When to Use
+
+✅ **Use `usul_al_fiqh` prompt for:**
+- Legal theory manuals
+- Books on qiyas, ijma', and naskh
+- Methodological dispute texts
+- Hermeneutical principle works
+- Epistemology of Islamic law
+
+❌ **Don't use for:**
+- Practical legal rulings → Use `fiqh`
+- Fatwa Q&A → Use `fatawa`
+- Mixed scholarly works → Use `encyclopedia_mixed`
+
+## Common Pitfalls
+
+### 1. English-only Terms
+
+❌ Wrong: "The command indicates obligation"  
+✅ Right: "The amr (command) indicates wujūb (obligation)"
+
+### 2. Resolving Unresolved Disputes
+
+❌ Wrong: "The correct view is that amr means obligation"  
+✅ Right: "Some say amr means obligation; others say it may mean recommendation"
+
+### 3. Inventing Structure Labels
+
+❌ Wrong: Adding "Issue:" when Arabic has narrative text  
+✅ Right: Only use labels when Arabic has explicit markers (مسألة, فصل, etc.)
+
+### 4. Omitting Technical Term Definitions
+
+❌ Wrong: "The ʿāmm is restricted by the khāṣṣ" (undefined terms)  
+✅ Right: "The ʿāmm (general) is restricted by the khāṣṣ (specific)"
+
+### 5. Adding Verse Numbers
+
+❌ Wrong: Adding `[2:43]` when source doesn't include it  
+✅ Right: Only include citations present in the Arabic
+
+## Example Output
+
+**Input segment:**
+```
+P678 - فصل: في القياس
+مسألة: القياس حجة عند الجمهور. فإن قيل: القياس ظني فلا يصلح دليلاً. قلنا: الظن معتبر في الفروع. والدليل قوله تعالى: {فاعتبروا}.
+```
+
+**Expected output:**
+```
+P678 - Section: On Qiyās
+Issue: Qiyās (analogical reasoning) is a valid proof (ḥujjah) according to the majority. If it is said: Qiyās is probabilistic (ẓannī) and thus not suitable as evidence (dalīl). We say: Probability is considered valid in subsidiary matters (furūʿ). The evidence is His statement, exalted is He: {So take a lesson}.
+```
+
+## Integration with Validation
+
+```typescript
+import { getPrompt, validateTranslationResponse } from 'wobble-bibble';
+
+const prompt = getPrompt('usul_al_fiqh');
+
+// Send prompt.content to LLM...
+const llmOutput = "P678 - Section: On Qiyās...";
+
+// Validate the response
+const validation = validateTranslationResponse(llmOutput, sourceSegments);
+
+if (!validation.isValid) {
+  console.error('Validation errors:', validation.errors);
+}
+```
+
+## Relationship to Other Prompts
+
+Usul al-fiqh shares concepts with:
+
+- **Fiqh prompt:** Legal categorization, madhab attribution
+- **Hadith prompt:** When citing hadith evidence
+- **Encyclopedia mixed prompt:** For works blending usul with other genres
+
+If a text mixes usul theory with practical fiqh rulings, consider using `encyclopedia_mixed`.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Fiqh Prompt" icon="scale-balanced" href="/prompts/fiqh">
+    Practical legal rulings derived from usul principles
+  </Card>
+  
+  <Card title="Encyclopedia Mixed" icon="layer-group" href="/prompts/encyclopedia-mixed">
+    For works mixing usul with other genres
+  </Card>
+  
+  <Card title="Validation Guide" icon="circle-check" href="/validation/overview">
+    Learn how outputs are validated
+  </Card>
+  
+  <Card title="Prompt API" icon="code" href="/api-reference/prompts">
+    Complete prompt management API reference
+  </Card>
+</CardGroup>

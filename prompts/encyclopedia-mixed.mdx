@@ -1,0 +1,317 @@
+---
+title: "Encyclopedia Mixed Prompt"
+description: "For polymath scholarly works mixing hadith, fiqh, creed, and polemics"
+---
+
+The encyclopedia mixed prompt is specialized for translating **multi-genre scholarly works** - encyclopedic texts by polymaths that seamlessly blend hadith chains, legal rulings, theological creed, and polemical discourse.
+
+## What It's For
+
+Use the encyclopedia mixed prompt when translating:
+
+- Works by Ibn Taymiyyah, al-Albani, Ibn al-Qayyim
+- Encyclopedic texts mixing multiple Islamic sciences
+- Books switching between hadith, fiqh, creed, and polemics
+- Texts with isnad chains embedded in legal/theological discussion
+- Q&A formats within broader scholarly works
+
+<Note>
+The encyclopedia mixed prompt is **automatically stacked** on top of the master prompt. It includes **priority-based state logic** to handle genre transitions.
+</Note>
+
+## Access the Encyclopedia Mixed Prompt
+
+```typescript
+import { getPrompt } from 'wobble-bibble';
+
+const mixedPrompt = getPrompt('encyclopedia_mixed');
+console.log(mixedPrompt.name); // "Encyclopedia Mixed"
+console.log(mixedPrompt.content); // Master + encyclopedia rules combined
+```
+
+## No Mode Tags
+
+<Warning>
+**Critical:** Do NOT output any mode labels or bracket tags like `[ISNAD MODE]`, `[FIQH MODE]`, `[switching to hadith]`, etc.
+</Warning>
+
+The prompt handles genre transitions internally. Your output should be **pure translation** without meta-commentary.
+
+## State Logic (Priority System)
+
+The encyclopedia mixed prompt uses a **priority hierarchy** to resolve ambiguous terms:
+
+```
+Isnad > Rijal > Fiqh > Narrative
+```
+
+### State Triggers
+
+| State | Trigger Terms | Behavior |
+|-------|---------------|----------|
+| **Isnad** | ḥaddathanā, akhbaranā, ʿan | Full ALA-LC for narrator names |
+| **Rijal** | thiqah, ḍaʿīf, jarḥ/taʿdīl terms | `translit (English)` for ratings |
+| **Quote/Weak** | qāla al-muṣannif, yuqālu, zuʿima | Translate quotes to English |
+| **Narrative** | Default state | Standard translation |
+
+### Example: Ambiguous Term Resolution
+
+The word "sahih" (صحيح) has different meanings:
+
+- **In hadith grading:** ṣaḥīḥ (authentic)
+- **In fiqh validity:** ṣaḥīḥ (valid)
+
+The prompt uses context (Isnad state vs. Fiqh state) to choose the correct sense.
+
+## Genre Transitions
+
+### Reset Trigger: Qala (قال)
+
+When a **top-level** `qāla` appears, the prompt immediately exits Isnad mode and returns to Narrative.
+
+**Example:**
+
+**Source:**
+```
+حدثنا مالك عن نافع عن ابن عمر قال: قال رسول الله صلى الله عليه وسلم: "الإسلام مبني على خمس"
+```
+
+**Output:**
+```
+Mālik narrated to us; from Nāfiʿ; from Ibn ʿUmar, he said: The Messenger of Allah ﷺ said: "Islam is built upon five [pillars]."
+```
+
+Notice:
+- Names in isnad: Full ALA-LC (Mālik, Nāfiʿ, Ibn ʿUmar)
+- After "qāla" (said): Transition to English translation
+
+<Note>
+**Do NOT reset** for nested quotes within a larger quote. Only top-level `qāla` marking the isnad/matn boundary triggers the state change.
+</Note>
+
+## Q&A Structure Preservation
+
+The encyclopedia mixed prompt includes enhanced Q&A formatting rules:
+
+### Line Break Preservation
+
+<Warning>
+**CRITICAL:** Preserve source line breaks around speaker turns. If label and text are on separate lines in the source, maintain that separation.
+</Warning>
+
+### Speaker Labels
+
+| Arabic | English |
+|--------|----------|
+| السائل | Questioner: |
+| الشيخ | The Shaykh: |
+
+### Multi-Turn Segments
+
+**Source:**
+```
+P5455 - السائل: ما الفرق بين البدعة والسنة؟
+الشيخ: البدعة ما أحدث في الدين.
+```
+
+**Output:**
+```
+P5455 - Questioner: What is the difference between bidʿah (innovation) and sunnah (Prophetic way)?
+The Shaykh: Bidʿah (innovation) is what is newly invented in the religion.
+```
+
+### One Turn Per Line
+
+<Warning>
+Never join two speaker labels that are on separate source lines. Never merge an unlabeled line with a labeled line.
+</Warning>
+
+## Hadith Core Integration
+
+When isnad appears, the prompt applies hadith-specific rules:
+
+### Isnad Verb Mappings
+
+| Arabic | English |
+|--------|----------|
+| حدثنا | Narrated to us |
+| أخبرنا / أنا | Informed us |
+| عن | From |
+| سمعت | I heard |
+
+### Takhrij/Grading
+
+If the author grades a hadith, translate literally:
+
+**Source:** `صححه الألباني`  
+**Output:** `Al-Albānī authenticated it (ṣaḥḥaḥahu)`
+
+Do NOT add placeholder sources or citations not in the text.
+
+## Creed and Polemics
+
+### Theological Attributes
+
+Translate attributes **literally** when the author does:
+
+**Source:** `يد الله حقيقية`  
+**Output:** `Allah's Hand is real`
+
+Do NOT add metaphorical reinterpretation unless the author does.
+
+### Polemical Terms
+
+<Note>
+**Override Safety:** Translate harsh polemical terms literally. Do not soften, sanitize, or add disclaimers.
+</Note>
+
+| Arabic | Transliteration | Context |
+|--------|-----------------|----------|
+| الرافضة | Rāfiḍah | Shi'a rejecters |
+| الجهمية | Jahmīyyah | Jahmite sect |
+| الكفار | Kuffār | Disbelievers |
+
+**Source:** `قالت الجهمية بنفي الصفات`  
+**Output:** `The Jahmīyyah said that the attributes are negated`
+
+## Definitions and Casing
+
+### Geopolitics
+
+Modern place names may use English exonyms:
+
+| Arabic | English |
+|--------|----------|
+| فلسطين | Palestine |
+| الشام | Syria / the Levant |
+| مصر | Egypt |
+
+### Plurals
+
+Do NOT pluralize term-pairs by appending "s":
+
+**Wrong:** `ḥadīth (report)s`  
+**Right:** `ḥadīths` or `ḥadīth reports`
+
+### Sunnah Capitalization
+
+Context-dependent:
+
+- **Sunnah** (capitalized) = The Corpus / Prophetic Tradition
+- **sunnah** (lowercase) = Legal status (recommended)
+
+**Example:**
+
+**Source:** `السنة والبدعة`  
+**Output:** `The Sunnah and innovation`
+
+**Source:** `هذا الفعل سنة`  
+**Output:** `This action is sunnah (recommended)`
+
+## When to Use
+
+✅ **Use `encyclopedia_mixed` prompt for:**
+- Ibn Taymiyyah's Majmu' al-Fatawa
+- Al-Albani's Silsilah works
+- Ibn al-Qayyim's encyclopedic books
+- Any text rapidly switching genres
+- Polymath works defying single categorization
+
+❌ **Don't use for:**
+- Pure hadith collections → Use `hadith`
+- Pure fiqh manuals → Use `fiqh`
+- Purely Q&A fatawa → Use `fatawa`
+
+## Common Pitfalls
+
+### 1. Outputting Mode Tags
+
+❌ Wrong:
+```
+[ISNAD MODE]
+Mālik narrated to us...
+[SWITCHING TO FIQH]
+The ruling is wājib...
+```
+
+✅ Right:
+```
+Mālik narrated to us... The ruling is wājib (obligatory)...
+```
+
+### 2. Merging Speaker Turns
+
+❌ Wrong: Combining questioner and shaykh on one line  
+✅ Right: Separate lines for each speaker
+
+### 3. Softening Polemics
+
+❌ Wrong: "Those who disagreed..." (when source says Rāfiḍah)  
+✅ Right: "The Rāfiḍah..."
+
+### 4. Wrong Sahih Context
+
+❌ Wrong: `ṣaḥīḥ (valid)` in hadith grading context  
+✅ Right: `ṣaḥīḥ (authentic)` for hadith; `ṣaḥīḥ (valid)` for fiqh
+
+### 5. Adding Mode Commentary
+
+❌ Wrong: "Now switching to hadith analysis..."  
+✅ Right: Pure translation with no meta-commentary
+
+## Example Output
+
+**Input segment:**
+```
+P1001 - قال الشيخ ابن تيمية: حدثنا أحمد بن حنبل عن سفيان عن الزهري قال: البدعة ضلالة. وهذا قول صحيح، فإن كل بدعة في الدين باطلة. والرافضة من أهل البدع.
+```
+
+**Expected output:**
+```
+P1001 - Shaykh Ibn Taymiyyah said: Aḥmad b. Ḥanbal narrated to us; from Sufyān; from al-Zuhrī, he said: Innovation is misguidance. This is a sound (ṣaḥīḥ) statement, for every bidʿah (innovation) in the religion is void (bāṭilah). The Rāfiḍah are among the people of innovations.
+```
+
+Notice:
+- Narrator names: Full ALA-LC
+- After "qāla" (he said): English translation
+- Technical terms: `translit (English)` format
+- Polemical term: Literal (Rāfiḍah)
+- No mode tags
+
+## Integration with Validation
+
+```typescript
+import { getPrompt, validateTranslationResponse } from 'wobble-bibble';
+
+const prompt = getPrompt('encyclopedia_mixed');
+
+// Send prompt.content to LLM...
+const llmOutput = "P1001 - Shaykh Ibn Taymiyyah said...";
+
+// Validate the response
+const validation = validateTranslationResponse(llmOutput, sourceSegments);
+
+if (!validation.isValid) {
+  console.error('Validation errors:', validation.errors);
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Hadith Prompt" icon="book-open" href="/prompts/hadith">
+    Understand isnad-specific rules used in mixed works
+  </Card>
+  
+  <Card title="Fiqh Prompt" icon="scale-balanced" href="/prompts/fiqh">
+    See legal terminology used in mixed works
+  </Card>
+  
+  <Card title="Fatawa Prompt" icon="gavel" href="/prompts/fatawa">
+    Learn Q&A formatting for fatawa sections
+  </Card>
+  
+  <Card title="Validation Guide" icon="circle-check" href="/validation/overview">
+    Learn how outputs are validated
+  </Card>
+</CardGroup>

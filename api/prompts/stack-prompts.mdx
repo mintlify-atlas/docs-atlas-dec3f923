@@ -1,0 +1,211 @@
+---
+title: stackPrompts
+description: Combine a master prompt with a specialized addon prompt
+---
+
+## Function Signature
+
+```typescript
+function stackPrompts(master: string, addon: string): string
+```
+
+Stacks a master/base prompt with a specialized addon prompt by combining them with a newline separator. This is the core utility function used internally by other prompt functions. Use it when you need to create custom prompt combinations.
+
+## Parameters
+
+<ParamField path="master" type="string" required>
+  The master/base prompt text. Typically the foundational rules that apply universally.
+</ParamField>
+
+<ParamField path="addon" type="string" required>
+  The specialized addon prompt text. Contains domain-specific rules that extend or refine the master prompt.
+</ParamField>
+
+## Returns
+
+<ResponseField name="combined" type="string">
+  Combined prompt text with master and addon separated by a newline. If either parameter is empty, returns the non-empty one. If both are empty, returns an empty string.
+</ResponseField>
+
+## Behavior
+
+- If `master` is empty: returns `addon`
+- If `addon` is empty: returns `master`
+- If both are provided: returns `master + "\n" + addon`
+- If both are empty: returns empty string
+
+## Example
+
+```typescript
+import { stackPrompts, getMasterPrompt } from 'wobble-bibble';
+
+const master = getMasterPrompt();
+const customAddon = `
+## Additional Rules for Aqidah
+
+- Preserve theological precision
+- Translate creedal statements literally
+`;
+
+const combined = stackPrompts(master, customAddon);
+
+console.log(combined);
+// [Full master prompt text]
+// 
+// ## Additional Rules for Aqidah
+// 
+// - Preserve theological precision
+// - Translate creedal statements literally
+```
+
+## Custom Addon Creation
+
+```typescript
+import { stackPrompts, getMasterPrompt } from 'wobble-bibble';
+
+// Create a custom addon for a specialized domain
+const seerahAddon = `
+## Seerah (Prophetic Biography) Specialization
+
+### Historical Context
+- Preserve chronological markers (e.g., "Year 3 AH")
+- Translate place names using historical forms
+- Keep battle names in transliterated form: Badr, Uḥud, Khandaq
+
+### Names
+- Companions: Use full name on first mention, then common short form
+- Example: "Abū Bakr al-Ṣiddīq" first, then "Abū Bakr"
+
+### Dating
+- Always use Hijri calendar (AH) as primary
+- Gregorian (CE) in parentheses if source provides it
+`;
+
+const seerahPrompt = stackPrompts(getMasterPrompt(), seerahAddon);
+
+// Use with LLM
+const response = await llm.chat({
+  system: seerahPrompt,
+  messages: [{
+    role: 'user',
+    content: 'P1: ولد النبي صلى الله عليه وسلم في عام الفيل'
+  }]
+});
+```
+
+## Layered Stacking
+
+```typescript
+import { stackPrompts, getMasterPrompt } from 'wobble-bibble';
+
+// Create a base scholarly addon
+const scholarlyBase = `
+## Scholarly Text Rules
+- Preserve footnote markers
+- Keep bibliographic references intact
+`;
+
+// Create a specialized layer
+const modernScholarAddon = `
+## Modern Scholarship Additions
+- Keep parenthetical citations: (Author, Year)
+- Preserve ISBN/DOI codes
+`;
+
+// Stack in layers
+const master = getMasterPrompt();
+const withScholarly = stackPrompts(master, scholarlyBase);
+const complete = stackPrompts(withScholarly, modernScholarAddon);
+
+console.log(complete);
+// [Master]
+// [Scholarly base rules]
+// [Modern scholarship rules]
+```
+
+## Empty Handling
+
+```typescript
+import { stackPrompts } from 'wobble-bibble';
+
+// Empty master - returns addon only
+const result1 = stackPrompts('', 'Custom rules');
+console.log(result1); // "Custom rules"
+
+// Empty addon - returns master only
+const result2 = stackPrompts('Master rules', '');
+console.log(result2); // "Master rules"
+
+// Both empty - returns empty string
+const result3 = stackPrompts('', '');
+console.log(result3); // ""
+
+// Both provided - combined with newline
+const result4 = stackPrompts('Master', 'Addon');
+console.log(result4); // "Master\nAddon"
+```
+
+## Testing Custom Prompts
+
+```typescript
+import { stackPrompts, getMasterPrompt } from 'wobble-bibble';
+import { validateResponse } from 'wobble-bibble';
+
+// Create a test addon
+const testAddon = `
+## Test Rules
+- Rule 1
+- Rule 2
+`;
+
+const testPrompt = stackPrompts(getMasterPrompt(), testAddon);
+
+// Test with sample input
+const testSegments = [
+  { id: 'P1', text: 'قال الله تعالى...' }
+];
+
+const llmResponse = await llm.generate(testPrompt, testSegments);
+const validation = validateResponse(llmResponse, testSegments);
+
+if (validation.errors.length === 0) {
+  console.log('Custom prompt works!');
+} else {
+  console.log('Issues found:', validation.errors);
+}
+```
+
+## Replicating Built-in Prompts
+
+```typescript
+import { stackPrompts, getMasterPrompt, getPrompt } from 'wobble-bibble';
+
+// The built-in getPrompt function uses stackPrompts internally
+const hadithPrompt = getPrompt('hadith');
+
+// You can replicate this manually:
+const master = getMasterPrompt();
+const hadithAddon = `
+## Hadith-specific rules
+// ... addon content ...
+`;
+const manualStack = stackPrompts(master, hadithAddon);
+
+// They work the same way
+console.log(hadithPrompt.content === manualStack); // false (different addon)
+// But the pattern is identical
+```
+
+<Note>
+  This function is used internally by `getPrompt()` and `getStackedPrompt()` to combine the master prompt with specialized addons. You typically don't need to call it directly unless you're creating custom prompt combinations.
+</Note>
+
+<Warning>
+  Always stack the master prompt first, then add specialized rules. The master prompt establishes critical constraints (no Arabic script, ID preservation, etc.) that specialized addons build upon. Reversing the order may cause unexpected behavior.
+</Warning>
+
+## Related
+
+- [getMasterPrompt](/api/prompts/get-master-prompt) - Get the base master prompt
+- [getPrompt](/api/prompts/get-prompt) - Get a built-in stacked prompt
+- [getStackedPrompt](/api/prompts/get-stacked-prompt) - Get stacked content by ID

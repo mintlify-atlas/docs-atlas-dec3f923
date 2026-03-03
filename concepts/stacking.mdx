@@ -1,0 +1,332 @@
+---
+title: Stacking
+description: Understand how wobble-bibble combines master and addon prompts to handle complex Islamic texts
+---
+
+Prompt stacking is the core mechanism wobble-bibble uses to combine universal translation rules (master) with genre-specific instructions (addons).
+
+## How stacking works
+
+When you request a prompt, wobble-bibble:
+
+1. Loads the master prompt (`prompts/master_prompt.md`)
+2. Loads the requested addon (e.g., `prompts/hadith.md`)
+3. Concatenates them with a newline separator
+4. Returns the combined text
+
+```typescript
+// From src/prompts.ts:26-34
+export const stackPrompts = (master: string, addon: string): string => {
+    if (!master) {
+        return addon;
+    }
+    if (!addon) {
+        return master;
+    }
+    return `${master}\n${addon}`;
+};
+```
+
+<Info>
+The master prompt always comes first. This ensures base rules are loaded before specialized overrides.
+</Info>
+
+## Why stacking?
+
+Islamic texts span multiple genres with different conventions:
+
+- **Ḥadīth** uses isnād chains with specific narrator name rules
+- **Fiqh** uses technical legal terminology
+- **Tafsīr** quotes Qurʾānic verses with special formatting
+- **Fatāwā** uses Q&A structure with speaker labels
+
+A single monolithic prompt would be:
+- Too large (exceeding token budgets)
+- Full of conflicting rules
+- Difficult to maintain
+
+Stacking keeps the master prompt lean while allowing specialized rules to override or extend it.
+
+## Stacking API
+
+The library provides several ways to access stacked prompts:
+
+### Get a specific stacked prompt
+
+```typescript
+import { getPrompt } from 'wobble-bibble';
+
+const hadithPrompt = getPrompt('hadith');
+
+console.log(hadithPrompt.id);        // 'hadith'
+console.log(hadithPrompt.name);      // Human-readable name
+console.log(hadithPrompt.content);   // Master + hadith addon
+console.log(hadithPrompt.isMaster);  // false
+```
+
+### Get all prompts
+
+```typescript
+import { getPrompts } from 'wobble-bibble';
+
+const allPrompts = getPrompts();
+
+allPrompts.forEach(prompt => {
+    console.log(`${prompt.id}: ${prompt.isMaster ? 'Master' : 'Addon'}`);
+});
+
+// Output:
+// master_prompt: Master
+// hadith: Addon
+// fiqh: Addon
+// tafsir: Addon
+// ...
+```
+
+### Get just the text
+
+```typescript
+import { getStackedPrompt } from 'wobble-bibble';
+
+const fiqhText = getStackedPrompt('fiqh');
+// Returns master + fiqh addon as a single string
+```
+
+### Get only the master
+
+```typescript
+import { getMasterPrompt } from 'wobble-bibble';
+
+const masterText = getMasterPrompt();
+// Returns just the master prompt (no addon)
+```
+
+## Rule precedence
+
+When master and addon rules conflict, the addon typically wins because:
+
+1. LLMs read prompts sequentially
+2. Later instructions often override earlier ones
+3. Addons are more specific than the master
+
+However, some master rules are intentionally "hard" and cannot be overridden.
+
+### Hard constraints (cannot override)
+
+These master rules apply to all prompts, regardless of addon:
+
+- **Script lock**: No Arabic script except ﷺ
+- **ID integrity**: Never invent or duplicate segment IDs
+- **No inference**: Don't guess missing text
+- **Plain text**: No Markdown formatting
+
+### Soft constraints (can extend)
+
+These master rules can be specialized by addons:
+
+- **Transliteration style**: Addons can define genre-specific name handling
+- **Term definitions**: Addons can require specific `translit (English)` patterns
+- **Structure**: Addons can add formatting rules (Q&A labels, verse brackets)
+
+## Example: Encyclopedia mixed
+
+The `encyclopedia_mixed` addon demonstrates advanced stacking. It handles texts that switch between multiple genres (ḥadīth, fiqh, tafsīr) within a single work.
+
+```markdown
+// From prompts/encyclopedia_mixed.md
+
+STATE LOGIC (Priority: Isnad > Rijal > Fiqh > Narrative):
+- ISNAD (Triggers: ḥaddathanā, akhbaranā, ʿan): Use FULL ALA-LC for names.
+- RIJAL (Triggers: jarḥ/taʿdīl terms like thiqah, ḍaʿīf): Use translit (English) for ratings.
+- QUOTE/WEAK (Triggers: qāla al-muṣannif, yuqālu, zuiʿma): Translate quotes into English.
+- RESET: At "qāla" or "matn" (TOP-LEVEL only): Return to Narrative.
+```
+
+This addon:
+1. Extends the master's transliteration rules
+2. Adds state-based logic for switching between modes
+3. Defines priority when rules conflict
+
+<Note>
+The `encyclopedia_mixed` addon explicitly states "Priority: Isnad > Rijal > Fiqh" to resolve ambiguity when technical terms overlap between genres.
+</Note>
+
+## Conflict resolution patterns
+
+### Explicit override
+
+Addons can explicitly override master rules:
+
+```markdown
+// Master prompt forbids parentheses in most cases
+// Fiqh addon explicitly allows them for technical definitions:
+
+Parentheses: Allowed IF present in source OR for 
+(a) technical definitions, (b) dates, (c) book codes.
+```
+
+### Final sweep override
+
+Some addons add a "final sweep" that runs after all other rules:
+
+```markdown
+// From encyclopedia_mixed.md:22-23
+
+FINAL ADD-ON OVERRIDE (APPLY LAST):
+- Zero Arabic script except ﷺ. If any remains (including inside quotes/parentheses 
+  or after Allah), replace the FULL Arabic span...
+```
+
+This pattern ensures the addon's Arabic leak prevention runs even if earlier rules allowed it.
+
+### Disambiguation
+
+Addons can disambiguate terms that mean different things in different contexts:
+
+```markdown
+// From encyclopedia_mixed.md:18
+
+DISAMBIGUATION: 
+- ṣaḥīḥ in hadith grading = ṣaḥīḥ (authentic)
+- ṣaḥīḥ in fiqh validity = ṣaḥīḥ (valid)
+- Sunnah (Capitalized) = The Corpus/Prophetic Tradition
+- sunnah (lowercase) = legal status/recommended
+```
+
+## Token budget management
+
+Prompt tokens are a constrained resource. Wobble-bibble's stacking design minimizes waste:
+
+### Master prompt principles
+
+- Lean rule blocks (no redundant wording)
+- High-signal constraints only
+- No duplicate rules across master/addons
+
+### Addon principles
+
+- Only add rules justified by failure evidence
+- Replace/tighten existing master rules rather than append
+- Avoid duplicate constraints unless closing a proven escape hatch
+
+<Warning>
+Before finalizing a prompt change, do a "lean pass" to remove redundant wording while preserving behavior. See the project's `AGENTS.md` for the token budget protocol.
+</Warning>
+
+## Stacking in practice
+
+Here's what happens when you call `getPrompt('fiqh')`:
+
+```typescript
+// From src/prompts.ts:42-48
+export const getPrompts = (): StackedPrompt[] => {
+    return PROMPTS.map((prompt) => ({
+        content: prompt.id === 'master_prompt' 
+            ? prompt.content 
+            : stackPrompts(MASTER_PROMPT, prompt.content),
+        id: prompt.id,
+        isMaster: prompt.id === 'master_prompt',
+        name: prompt.name,
+    }));
+};
+```
+
+The function:
+1. Checks if the prompt is the master
+2. If yes, returns master content only
+3. If no, stacks master + fiqh addon
+4. Wraps in a `StackedPrompt` object
+
+### Generated prompt structure
+
+The final stacked prompt looks like:
+
+```
+[Master Prompt Content]
+ROLE: Expert academic translator...
+CRITICAL NEGATIONS: 1. NO SANITIZATION...
+RULES: NO ARABIC SCRIPT...
+...
+[Master ends]
+
+[Fiqh Addon Content]
+STRUCTURE: Preserve chapter/section headings...
+FIQH/USUL TERMS: When technical terms appear...
+KHILAF/ATTRIBUTION: Preserve who is being attributed...
+...
+[Addon ends]
+```
+
+The LLM processes this as a single unified instruction set.
+
+## Prompt generation workflow
+
+Prompts are bundled at build time:
+
+1. Developer writes prompt files as Markdown in `prompts/`
+2. Developer runs `bun run generate` (part of `npm run build`)
+3. Script reads all `.md` files from `prompts/`
+4. Generates TypeScript definitions in `.generated/prompts.ts`
+5. Main code imports from `@generated/prompts` via path alias
+
+```typescript
+// From src/prompts.ts:1
+import { MASTER_PROMPT, PROMPTS, type PromptId, type PromptMetadata } 
+    from '@generated/prompts';
+```
+
+<Note>
+The `.generated/` directory is git-ignored. This keeps the source tree clean and separates content from code.
+</Note>
+
+## Custom stacking
+
+You can create custom prompt combinations:
+
+```typescript
+import { getMasterPrompt, stackPrompts } from 'wobble-bibble';
+
+const master = getMasterPrompt();
+const customAddon = `
+CUSTOM RULE: Always translate فلان as "so-and-so".
+CUSTOM RULE: Preserve Arabic numerals (١٢٣) as-is.
+`;
+
+const customPrompt = stackPrompts(master, customAddon);
+console.log(customPrompt);
+```
+
+This is useful for:
+- Testing new rules
+- One-off translation needs
+- Extending prompts without modifying the library
+
+## Debugging stacked prompts
+
+To see exactly what the LLM receives:
+
+```typescript
+import { getPrompt } from 'wobble-bibble';
+
+const prompt = getPrompt('encyclopedia_mixed');
+
+// Write to file for inspection
+import { writeFileSync } from 'fs';
+writeFileSync('debug_prompt.txt', prompt.content);
+```
+
+This helps diagnose:
+- Rule conflicts
+- Missing constraints
+- Token budget issues
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Prompts" icon="file-lines" href="/concepts/prompts">
+    Learn about master and addon prompts
+  </Card>
+  <Card title="Validation" icon="check" href="/concepts/validation">
+    Understand validation error types
+  </Card>
+</CardGroup>

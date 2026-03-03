@@ -1,0 +1,216 @@
+---
+title: FixConfig
+description: Configuration for fixer functions that repair LLM formatting errors
+---
+
+## Type definition
+
+```typescript
+type FixConfig = {
+  speakerLabels?: string[];
+  leadingPunctuation?: string[];
+};
+```
+
+## Properties
+
+<ResponseField name="speakerLabels" type="string[]">
+  Optional array of speaker labels to recognize when fixing collapsed speaker lines.
+  
+  If omitted, the fixer will attempt to infer labels from the text automatically.
+  
+  Examples:
+  ```typescript
+  ['Questioner', 'The Shaykh', 'Mu\'adhdhin']
+  ['Student', 'Teacher']
+  ['Q', 'A']
+  ```
+</ResponseField>
+
+<ResponseField name="leadingPunctuation" type="string[]">
+  Optional array of punctuation tokens that may appear before a collapsed speaker label.
+  
+  Used to detect patterns like `"... The Shaykh:"` where punctuation precedes the label.
+  
+  Default: `['.', '!', '?', '،', '؛']`
+  
+  Examples:
+  ```typescript
+  ['.', '!', '?']  // English punctuation only
+  ['،', '؛', '.']  // Arabic punctuation
+  ```
+</ResponseField>
+
+## Usage
+
+### With explicit speaker labels
+
+```typescript
+import { fixCollapsedSpeakerLines } from 'wobble-bibble';
+
+const text = `
+Questioner: First question here? The Shaykh: The answer is...
+`;
+
+const result = fixCollapsedSpeakerLines(text, {
+  speakerLabels: ['Questioner', 'The Shaykh']
+});
+
+console.log(result.text);
+// Output:
+// Questioner: First question here?
+// The Shaykh: The answer is...
+```
+
+### With automatic label inference
+
+```typescript
+import { fixCollapsedSpeakerLines } from 'wobble-bibble';
+
+const text = `
+Student: What is the ruling? Teacher: The ruling is...
+`;
+
+// No speakerLabels provided - will infer from text
+const result = fixCollapsedSpeakerLines(text);
+
+console.log(result.applied);
+// ['fixCollapsedSpeakerLines'] if labels were detected and fixed
+```
+
+### Custom punctuation handling
+
+```typescript
+import { fixCollapsedSpeakerLines } from 'wobble-bibble';
+
+const arabicText = `
+السائل: ما الحكم؟ الشيخ: الحكم هو...
+`;
+
+const result = fixCollapsedSpeakerLines(arabicText, {
+  speakerLabels: ['السائل', 'الشيخ'],
+  leadingPunctuation: ['؟', '،', '؛', '.']  // Arabic + English
+});
+```
+
+### Complete configuration
+
+```typescript
+import { fixCollapsedSpeakerLines, type FixConfig } from 'wobble-bibble';
+
+const config: FixConfig = {
+  speakerLabels: [
+    'Questioner',
+    'The Shaykh',
+    'Mu\'adhdhin',
+    'Imam'
+  ],
+  leadingPunctuation: [
+    '.',   // Period
+    '!',   // Exclamation
+    '?',   // Question
+    '،',   // Arabic comma
+    '؛',   // Arabic semicolon
+    '؟'    // Arabic question mark
+  ]
+};
+
+const result = fixCollapsedSpeakerLines(text, config);
+```
+
+## Label inference
+
+When `speakerLabels` is omitted, the fixer uses a pattern to detect labels:
+
+```typescript
+// Pattern from constants.ts
+const SPEAKER_LABEL_GUESS_PATTERN = /^([^:\n]{1,28}):/gm;
+```
+
+This finds:
+- Lines starting with text followed by `:`
+- Label is 1-28 characters
+- Maximum 2 words
+
+Examples that will be detected:
+```
+Questioner:      ✓ (detected)
+The Shaykh:      ✓ (detected)
+Mu'adhdhin:      ✓ (detected)
+Q:               ✓ (detected)
+
+This is too long to be a label:  ✗ (ignored, >28 chars)
+```
+
+## Punctuation preservation
+
+The fixer preserves trailing punctuation before inserting line breaks:
+
+### Before fix
+```
+Text continues here. The Shaykh: Answer here.
+```
+
+### After fix (punctuation preserved)
+```
+Text continues here.
+The Shaykh: Answer here.
+```
+
+The period stays with the preceding text, not moved to a new line.
+
+## Default punctuation
+
+If `leadingPunctuation` is omitted, the default includes:
+
+```typescript
+const DEFAULT_LEADING_PUNCTUATION = [
+  '.',   // Period
+  '!',   // Exclamation
+  '?',   // Question mark
+  '،',   // Arabic comma (U+060C)
+  '؛'    // Arabic semicolon (U+061B)
+];
+```
+
+## Common patterns
+
+### Fatawa Q&A format
+
+```typescript
+const fatawaConfig: FixConfig = {
+  speakerLabels: ['Questioner', 'The Shaykh'],
+  leadingPunctuation: ['.', '?', '،', '؛', '؟']
+};
+```
+
+### Academic dialogue
+
+```typescript
+const academicConfig: FixConfig = {
+  speakerLabels: ['Student', 'Professor', 'Researcher'],
+  leadingPunctuation: ['.', ',', ';', ':']
+};
+```
+
+### Minimal configuration
+
+```typescript
+const minimalConfig: FixConfig = {
+  // Auto-detect labels, use default punctuation
+};
+
+// Equivalent to:
+const result = fixCollapsedSpeakerLines(text);
+```
+
+## Related types
+
+- [FixResult](/api/types/fix-result) - Return type from fixer functions
+- [FixAllOptions](/api/fixers/fix-all) - Options for batch fixing
+- [ValidationErrorType](/api/validation/validation-error-type-info) - `collapsed_speakers` error type
+
+## Related functions
+
+- [fixCollapsedSpeakerLines](/api/fixers/fix-collapsed-speaker-lines) - Uses this config
+- [fixAll](/api/fixers/fix-all) - Accepts config for multiple fixers

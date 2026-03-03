@@ -1,0 +1,217 @@
+---
+title: getPromptIds
+description: Get the list of available prompt IDs for validation or UI generation
+---
+
+## Function Signature
+
+```typescript
+function getPromptIds(): PromptId[]
+```
+
+Returns an array of all available prompt IDs. Useful for building UI dropdowns, validation logic, or iterating through prompts without loading their full content.
+
+## Parameters
+
+None.
+
+## Returns
+
+<ResponseField name="PromptId[]" type="array">
+  Array of prompt identifier strings, ordered with master prompt first, then alphabetically by name
+</ResponseField>
+
+## Example
+
+```typescript
+import { getPromptIds } from 'wobble-bibble';
+
+const ids = getPromptIds();
+
+console.log(ids);
+// [
+//   'master_prompt',
+//   'encyclopedia_mixed',
+//   'fatawa',
+//   'fiqh',
+//   'hadith',
+//   'jarh_wa_tadil',
+//   'tafsir',
+//   'usul_al_fiqh'
+// ]
+```
+
+## Validation Example
+
+```typescript
+import { getPromptIds } from 'wobble-bibble';
+import type { PromptId } from 'wobble-bibble';
+
+function isValidPromptId(id: string): id is PromptId {
+  const validIds = getPromptIds();
+  return validIds.includes(id as PromptId);
+}
+
+// Use in API validation
+function handleRequest(promptId: string) {
+  if (!isValidPromptId(promptId)) {
+    throw new Error(`Invalid prompt ID: ${promptId}`);
+  }
+  
+  // TypeScript now knows promptId is a valid PromptId
+  const prompt = getPrompt(promptId);
+  return prompt;
+}
+```
+
+## UI Selector Example
+
+```typescript
+import { getPromptIds, getPrompt } from 'wobble-bibble';
+
+// Build a simple dropdown
+const promptIds = getPromptIds();
+const options = promptIds.map(id => {
+  const prompt = getPrompt(id);
+  return {
+    value: id,
+    label: prompt.name
+  };
+});
+
+console.log(options);
+// [
+//   { value: 'master_prompt', label: 'Master Prompt' },
+//   { value: 'encyclopedia_mixed', label: 'Encyclopedia Mixed' },
+//   { value: 'fatawa', label: 'Fatawa' },
+//   ...
+// ]
+```
+
+## React Hook Example
+
+```tsx
+import { getPromptIds } from 'wobble-bibble';
+import { useMemo } from 'react';
+
+function usePromptOptions() {
+  return useMemo(() => {
+    const ids = getPromptIds();
+    return ids.filter(id => id !== 'master_prompt');
+  }, []);
+}
+
+function PromptSelector() {
+  const addonIds = usePromptOptions();
+  
+  return (
+    <select>
+      {addonIds.map(id => (
+        <option key={id} value={id}>
+          {id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+        </option>
+      ))}
+    </select>
+  );
+}
+```
+
+## CLI Autocomplete Example
+
+```typescript
+import { getPromptIds } from 'wobble-bibble';
+import inquirer from 'inquirer';
+
+async function promptUserForPromptId() {
+  const ids = getPromptIds();
+  
+  const answer = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'promptId',
+      message: 'Select a prompt:',
+      choices: ids.map(id => ({
+        name: id.replace(/_/g, ' ').toUpperCase(),
+        value: id
+      }))
+    }
+  ]);
+  
+  return answer.promptId;
+}
+```
+
+## Filtering Examples
+
+```typescript
+import { getPromptIds } from 'wobble-bibble';
+
+const allIds = getPromptIds();
+
+// Get only addon prompts (exclude master)
+const addonIds = allIds.filter(id => id !== 'master_prompt');
+console.log(addonIds);
+// [
+//   'encyclopedia_mixed',
+//   'fatawa',
+//   'fiqh',
+//   'hadith',
+//   'jarh_wa_tadil',
+//   'tafsir',
+//   'usul_al_fiqh'
+// ]
+
+// Find prompts containing specific text
+const fiqhRelated = allIds.filter(id => id.includes('fiqh'));
+console.log(fiqhRelated);
+// ['fiqh', 'usul_al_fiqh']
+```
+
+## Performance Consideration
+
+```typescript
+import { getPromptIds, getPrompts } from 'wobble-bibble';
+
+// Efficient: Only loads IDs, not full prompt content
+const ids = getPromptIds();
+console.log(`Available prompts: ${ids.length}`);
+
+// Less efficient: Loads all prompt content
+const prompts = getPrompts();
+console.log(`Available prompts: ${prompts.length}`);
+
+// Best practice: Use getPromptIds when you only need IDs
+function listAvailablePrompts() {
+  return getPromptIds().join(', ');
+}
+```
+
+<Tip>
+  Use `getPromptIds()` instead of `getPrompts().map(p => p.id)` when you only need the IDs. It's more efficient and makes your intent clearer.
+</Tip>
+
+## Type Safety
+
+```typescript
+import { getPromptIds } from 'wobble-bibble';
+import type { PromptId } from 'wobble-bibble';
+
+// The return type is PromptId[], which is a union of literal types
+const ids: PromptId[] = getPromptIds();
+
+// TypeScript enforces valid values
+function processPrompt(id: PromptId) {
+  // ...
+}
+
+// This works:
+processPrompt(ids[0]);
+
+// This fails at compile time:
+// processPrompt('invalid_prompt'); // Type error!
+```
+
+## Related
+
+- [getPrompts](/api/prompts/get-prompts) - Get all prompts with metadata
+- [getPrompt](/api/prompts/get-prompt) - Get a specific prompt by ID

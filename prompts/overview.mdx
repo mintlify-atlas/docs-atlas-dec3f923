@@ -1,0 +1,110 @@
+---
+title: "Prompt Templates"
+description: "Specialized prompts for translating classical Islamic texts with precision and academic rigor"
+---
+
+Wobble-bibble provides a sophisticated prompt management system designed specifically for translating classical Arabic Islamic texts into English. The library uses a **stacking architecture** where specialized prompts are combined with a master prompt to create domain-specific translation instructions.
+
+## Architecture
+
+The prompt system consists of:
+
+1. **Master Prompt** - The foundational ruleset that applies to all translations
+2. **Specialized Prompts** - Domain-specific add-ons that extend the master prompt for particular text types
+
+When you request a specialized prompt (e.g., `hadith`), wobble-bibble automatically stacks it on top of the master prompt, ensuring consistent base rules while adding domain-specific guidance.
+
+## Available Prompts
+
+<CardGroup cols={2}>
+  <Card title="Master Prompt" icon="crown" href="/prompts/master-prompt">
+    The foundational ruleset for all Islamic text translations
+  </Card>
+  
+  <Card title="Hadith" icon="book-open" href="/prompts/hadith">
+    For hadith collections with isnad chains and narrator evaluation
+  </Card>
+  
+  <Card title="Fiqh" icon="scale-balanced" href="/prompts/fiqh">
+    For Islamic jurisprudence texts with legal rulings and technical terms
+  </Card>
+  
+  <Card title="Tafsir" icon="book-quran" href="/prompts/tafsir">
+    For Quranic exegesis with verse citations and theological attributes
+  </Card>
+  
+  <Card title="Fatawa" icon="gavel" href="/prompts/fatawa">
+    For legal opinions in Q&A format with questioner/scholar dialogue
+  </Card>
+  
+  <Card title="Encyclopedia Mixed" icon="layer-group" href="/prompts/encyclopedia-mixed">
+    For polymath works mixing hadith, fiqh, creed, and polemics
+  </Card>
+  
+  <Card title="Jarh wa Tadil" icon="user-check" href="/prompts/jarh-wa-tadil">
+    For narrator criticism and authentication texts
+  </Card>
+  
+  <Card title="Usul al-Fiqh" icon="landmark" href="/prompts/usul-al-fiqh">
+    For legal theory texts with methodological disputes
+  </Card>
+</CardGroup>
+
+## Usage
+
+Access prompts using the `getPrompt()` function:
+
+```typescript
+import { getPrompt } from 'wobble-bibble';
+
+// Get a stacked prompt (master + specialized)
+const hadithPrompt = getPrompt('hadith');
+console.log(hadithPrompt.content); // Contains master + hadith rules
+
+// Get just the master prompt
+const masterPrompt = getPrompt('master_prompt');
+console.log(masterPrompt.isMaster); // true
+```
+
+## Key Features
+
+### Zero Arabic Script (Except ﷺ)
+All prompts enforce a strict ban on Arabic script in output. Only the Prophet's salutation symbol (ﷺ) is permitted.
+
+### ALA-LC Transliteration
+Proper names and technical terms use full ALA-LC transliteration with diacritics (ā ī ū ḥ ṣ ḍ ṭ ẓ ʿ ʾ).
+
+### Technical Term Definitions
+On first occurrence, technical terms must be defined: `bidʿah (innovation)`
+
+### Segment ID Preservation
+All segments maintain their original IDs (e.g., `P1234`) for precise validation and tracking.
+
+### No Sanitization
+Polemical terms and sensitive content are translated literally without softening or editorial commentary.
+
+## Choosing the Right Prompt
+
+<Note>
+**Rule of thumb:** Match the prompt to the predominant genre of your text. For multi-genre works (like encyclopedias), use `encyclopedia_mixed`.
+</Note>
+
+- **Pure hadith collections?** → `hadith`
+- **Fiqh manuals with legal rulings?** → `fiqh`
+- **Tafsir with Quranic commentary?** → `tafsir`
+- **Fatwa compilations (Q&A)?** → `fatawa`
+- **Narrator biographies/criticism?** → `jarh_wa_tadil`
+- **Legal methodology debates?** → `usul_al_fiqh`
+- **Mixed scholarly works?** → `encyclopedia_mixed`
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Explore Prompts" icon="magnifying-glass" href="/prompts/master-prompt">
+    Browse detailed documentation for each prompt type
+  </Card>
+  
+  <Card title="Validation Guide" icon="circle-check" href="/validation/overview">
+    Learn how wobble-bibble validates LLM outputs
+  </Card>
+</CardGroup>

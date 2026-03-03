@@ -1,0 +1,136 @@
+---
+title: extractTranslationIds
+description: Extract translation IDs from normalized response text in order of appearance
+---
+
+## Overview
+
+Extracts all translation marker IDs from normalized text, preserving their order of appearance. This is useful for validating response structure and detecting missing or duplicate IDs.
+
+## Function Signature
+
+```typescript
+extractTranslationIds(text: string): string[]
+```
+
+## Parameters
+
+<ParamField path="text" type="string" required>
+  Translation text containing markers in the format "ID - Translation". Should be normalized using `normalizeTranslationText` first for best results.
+</ParamField>
+
+## Returns
+
+<ResponseField name="ids" type="string[]">
+  Array of extracted IDs in the order they appear in the text.
+</ResponseField>
+
+## Usage
+
+### Basic Example
+
+```typescript
+import { extractTranslationIds } from 'wobble-bibble';
+
+const response = `P1 - First translation
+P2 - Second translation
+P3 - Third translation`;
+
+const ids = extractTranslationIds(response);
+console.log(ids); // ['P1', 'P2', 'P3']
+```
+
+### Detecting Duplicates
+
+```typescript
+const response = `P1 - First
+P2 - Second
+P1 - Duplicate`;
+
+const ids = extractTranslationIds(response);
+console.log(ids); // ['P1', 'P2', 'P1']
+
+// Check for duplicates
+const hasDuplicates = ids.length !== new Set(ids).size;
+console.log(hasDuplicates); // true
+```
+
+### Validating Expected IDs
+
+```typescript
+const expected = ['P1', 'P2', 'P3'];
+const response = `P1 - Text
+P3 - More text`;
+
+const actual = extractTranslationIds(response);
+const missing = expected.filter(id => !actual.includes(id));
+
+console.log(missing); // ['P2']
+```
+
+### Handling Complex ID Formats
+
+```typescript
+// Works with various ID formats
+const response = `P1 - Text
+P2b - More text
+P123 - Even more`;
+
+const ids = extractTranslationIds(response);
+console.log(ids); // ['P1', 'P2b', 'P123']
+```
+
+## ID Format Requirements
+
+The function recognizes IDs that match the pattern defined by `MARKER_ID_PATTERN`. Valid IDs typically:
+
+- Start with a letter (often 'P' for paragraph)
+- May contain additional letters or numbers
+- Are followed by optional space and dashes (` - ` or ` -` or `- ` or `-`)
+
+**Examples of valid markers**:
+- `P1 - text`
+- `P2b- text`
+- `P123 -text`
+- `H5 - text` (for Hadith segments)
+
+## When to Use
+
+Use `extractTranslationIds` when:
+
+- Validating that all expected segments were translated
+- Checking for duplicate ID entries in responses
+- Verifying correct ID ordering in sequential translations
+- Building validation pipelines for LLM outputs
+- Debugging translation response structure issues
+
+This function is a key component of the validation system used to detect LLM hallucinations and output errors.
+
+## Best Practices
+
+1. **Always normalize first**: Use `normalizeTranslationText` before calling this function to ensure reliable ID extraction
+
+   ```typescript
+   const normalized = normalizeTranslationText(rawResponse);
+   const ids = extractTranslationIds(normalized);
+   ```
+
+2. **Compare with expected**: Always validate extracted IDs against your input segments
+
+   ```typescript
+   const expectedIds = segments.map(s => s.id);
+   const actualIds = extractTranslationIds(response);
+   const allPresent = expectedIds.every(id => actualIds.includes(id));
+   ```
+
+3. **Check for order**: For sequential translations, verify IDs appear in the correct order
+
+   ```typescript
+   const isOrdered = JSON.stringify(actualIds) === JSON.stringify(expectedIds);
+   ```
+
+## Related Functions
+
+- [`normalizeTranslationText`](/api/text-utils/normalize-translation-text) - Prepare text before ID extraction
+- [`parseTranslations`](/api/text-utils/parse-translations) - Extract both IDs and translations
+- [`parseTranslationsInOrder`](/api/text-utils/parse-translations-in-order) - Get ordered ID-translation pairs

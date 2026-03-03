@@ -1,0 +1,157 @@
+---
+title: ValidationConfig
+description: Configuration options for validation behavior
+---
+
+## Type definition
+
+```typescript
+type ValidationConfig = {
+  allCapsWordRunThreshold: number;
+};
+```
+
+## Properties
+
+<ResponseField name="allCapsWordRunThreshold" type="number" required>
+  Minimum number of consecutive ALL CAPS words to trigger an `all_caps` error.
+  
+  Default: `5`
+  
+  Detects "shouting" patterns in translations like:
+  ```
+  THIS IS VERY LOUD TEXT
+  ```
+</ResponseField>
+
+## Default configuration
+
+```typescript
+const DEFAULT_VALIDATION_CONFIG: ValidationConfig = {
+  allCapsWordRunThreshold: 5
+};
+```
+
+## Usage
+
+### Using default configuration
+
+```typescript
+import { validateTranslationResponse } from 'wobble-bibble';
+
+const segments = [
+  { id: 'P1', text: 'نص عربي' }
+];
+
+const response = 'P1 - Translation text';
+
+// Uses default config (allCapsWordRunThreshold: 5)
+const result = validateTranslationResponse(segments, response);
+```
+
+### Custom configuration
+
+```typescript
+import { validateTranslationResponse } from 'wobble-bibble';
+
+const segments = [
+  { id: 'P1', text: 'نص عربي' }
+];
+
+const response = 'P1 - THIS IS LOUD';
+
+// More sensitive to ALL CAPS (triggers at 3 words instead of 5)
+const result = validateTranslationResponse(segments, response, {
+  config: {
+    allCapsWordRunThreshold: 3
+  }
+});
+
+if (result.errors.some(e => e.type === 'all_caps')) {
+  console.log('Warning: Excessive capitalization detected');
+}
+```
+
+### Stricter validation
+
+```typescript
+const strictConfig: ValidationConfig = {
+  allCapsWordRunThreshold: 2  // Very strict
+};
+
+const result = validateTranslationResponse(segments, response, {
+  config: strictConfig
+});
+```
+
+### Lenient validation
+
+```typescript
+const lenientConfig: ValidationConfig = {
+  allCapsWordRunThreshold: 10  // Allow more caps
+};
+
+const result = validateTranslationResponse(segments, response, {
+  config: lenientConfig
+});
+```
+
+## Configuration rationale
+
+### Why detect ALL CAPS?
+
+LLMs sometimes use ALL CAPS to emphasize important terms or when uncertain. This can indicate:
+
+1. **Translation uncertainty** - The model doesn't know the proper rendering
+2. **Safety overrides** - Model is flagging potentially sensitive content
+3. **Formatting errors** - Lost casing information from source
+
+Example:
+```
+P1234 - The Shaykh said: THIS IS ABSOLUTELY FORBIDDEN IN ISLAM
+```
+
+This pattern suggests the LLM may be adding unwarranted emphasis.
+
+### Threshold tuning
+
+| Threshold | Use Case |
+|-----------|----------|
+| `2-3` | Strict academic translations (no emphasis allowed) |
+| `5` (default) | Balanced detection for most Islamic texts |
+| `8-10` | Lenient for texts with legitimate emphasis |
+
+<Note>
+The threshold is for **consecutive** words. `"THIS IS"` = 2 words, `"THIS IS VERY IMPORTANT"` = 4 words.
+</Note>
+
+## Future configuration options
+
+The library may expand `ValidationConfig` to include:
+
+```typescript
+// Hypothetical future options
+type ValidationConfig = {
+  allCapsWordRunThreshold: number;
+  
+  // Future additions:
+  minTranslationRatio?: number;              // Customize length checks
+  maxEmptyParentheses?: number;              // Customize () threshold
+  arabicLeakAllowedChars?: string[];         // Additional allowed chars
+  customSpeakerLabels?: string[];            // App-specific labels
+  strictIdFormat?: RegExp;                   // Custom ID patterns
+};
+```
+
+<Info>
+If you need additional configuration options, please open an issue on the [GitHub repository](https://github.com/ragaeeb/wobble-bibble/issues).
+</Info>
+
+## Related types
+
+- [ValidationError](/api/types/validation-error) - Errors produced by validation
+- [ValidationResponseResult](/api/validation/validate-translation-response) - Contains validation results
+
+## Related functions
+
+- [validateTranslationResponse](/api/validation/validate-translation-response) - Uses this config type

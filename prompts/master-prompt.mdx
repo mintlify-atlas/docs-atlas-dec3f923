@@ -1,0 +1,232 @@
+---
+title: "Master Prompt"
+description: "The foundational ruleset that applies to all Islamic text translations"
+---
+
+The master prompt is the **foundational layer** of wobble-bibble's prompt system. It contains universal rules that apply to all classical Islamic text translations, regardless of genre.
+
+## What It's For
+
+The master prompt establishes:
+
+- **Script constraints** - Zero Arabic script except ﷺ
+- **Transliteration standards** - Full ALA-LC with diacritics
+- **Output format** - Plain text with segment ID preservation
+- **Core negations** - No sanitization, inference, or restructuring
+- **Term definition rules** - How to handle technical vocabulary
+
+<Note>
+The master prompt is **automatically stacked** with specialized prompts. You rarely need to use it alone unless you're creating custom add-ons.
+</Note>
+
+## Access the Master Prompt
+
+```typescript
+import { getPrompt, getMasterPrompt } from 'wobble-bibble';
+
+// Method 1: Get as StackedPrompt object
+const master = getPrompt('master_prompt');
+console.log(master.isMaster); // true
+console.log(master.content); // Full master prompt text
+
+// Method 2: Get raw content directly
+const masterText = getMasterPrompt();
+```
+
+## Critical Negations
+
+The master prompt enforces eight hard constraints:
+
+1. **NO SANITIZATION** - Do not soften polemical terms
+2. **NO META-TALK** - Output translation only; no questions or commentary
+3. **NO MARKDOWN** - Plain text only; no formatting markup
+4. **NO EMENDATION** - Do not correct source typos or scribal errors
+5. **NO INFERENCE** - Do not fill in missing text
+6. **NO RESTRUCTURING** - Preserve original structure
+7. **NO OPAQUE TRANSLITERATION** - Must translate phrases into English
+8. **NO INVENTED SEGMENTS** - Do not create IDs not present in source
+
+## Arabic Script Ban
+
+The most critical rule in the master prompt is the **SCRIPT LOCK**:
+
+<Warning>
+Output must be 100% Latin script (ASCII + ALA-LC diacritics). Arabic script is forbidden **everywhere** - including inside quotes, brackets, parentheses, and citations. The only exception is ﷺ.
+</Warning>
+
+### Examples
+
+**Forbidden:**
+```
+Allah تعالى said...
+The term فضل (favor) means...
+He said "والله" (by Allah)...
+```
+
+**Correct:**
+```
+Allah said...
+The term faḍl (favor) means...
+He said "by Allah"...
+```
+
+## Transliteration Standards
+
+### ALA-LC Diacritics
+
+Use full ALA-LC for Arabic-script names and terms:
+
+- Long vowels: ā ī ū
+- Emphatic consonants: ḥ ṣ ḍ ṭ ẓ
+- Hamza and ayn: ʾ ʿ
+
+### Technical Term Format
+
+On first occurrence, define terms with `translit (English)` format:
+
+```
+bidʿah (innovation)
+isnād (chain of transmission)
+wājib (obligatory)
+```
+
+### Standardized Terms
+
+| Term | Required Form | Forbidden |
+|------|---------------|----------|
+| Prophet Muhammad | Muḥammad | Muhammad, Mohamed |
+| Islamic teacher | Shaykh | Sheikh |
+| Holy book | Qurʾān | Quran, Koran |
+| Islamic religion | Islām | Islam |
+| Prophetic report | ḥadīth | hadith, Hadith |
+
+### Allah vs. God
+
+<Note>
+**Special rule:** Always use "Allah" (no diacritics) when the source uses الله. Never substitute "God" or "Allāh".
+</Note>
+
+**Forbidden translations:**
+- "God willing" → Use `in shāʾ Allah`
+- "By God" → Use `by Allah`
+- "Praise be to God" → Use `al-ḥamdu li-Allah`
+
+## Locked Formulae
+
+These phrases must **never** be translated - output the transliteration exactly:
+
+### Greetings
+- `al-salāmu ʿalaykum` (NOT "peace be upon you")
+- `wa ʿalaykum al-salām`
+
+### Invocations
+- `in shāʾ Allah` (NOT "God willing")
+- `subḥān Allah` (NOT "glory be to God")
+- `al-ḥamdu li-Allah` (NOT "praise be to God")
+- `Allahu akbar` (NOT "God is greatest")
+- `lā ilāha illā Allah` (NOT "there is no god but God")
+
+## Output Format
+
+### Segment ID Structure
+
+Every translation line starts with:
+
+```
+ID - Translation text
+```
+
+**Critical:** Use ASCII hyphen with spaces (` - `), NOT em-dash or en-dash.
+
+**Examples:**
+```
+P405 - ʿAbd Allāh b. Yūsuf narrated to us...
+P406 - The Prophet ﷺ said: "Whoever believes in Allah..."
+```
+
+### Multi-line Segments (Q&A)
+
+For segments with speaker labels, output the ID only once:
+
+```
+P5803 - Questioner: What is the ruling on smoking?
+The Shaykh: It is prohibited due to its harm...
+```
+
+**NOT:**
+```
+P5803 - Questioner: What is the ruling on smoking?
+P5803 - The Shaykh: It is prohibited...
+```
+
+## Register & Style
+
+- Use **modern academic English**
+- Prefer modern auxiliaries (will/would, you/your)
+- No archaic King James-style phrasing
+- No ALL CAPS for emphasis
+- No emoji
+
+## ID Integrity Rules
+
+### Exact Match
+
+Output must contain **exactly** the same Segment IDs as the source, in the same order, each appearing exactly once.
+
+### No New IDs
+
+**Forbidden:**
+- Inventing IDs like `P123c`, `P123_cont`, `P123-part2`
+- Adding placeholders for missing IDs
+- Creating "(continued)" segments
+
+### Boundary Preservation
+
+Translate only the text belonging to each segment. Do not:
+- Merge segments
+- Move lines across ID boundaries
+- Split segments into multiple IDs
+
+## Final Script Sweep
+
+Before emitting output, the master prompt requires a **mandatory last pass**:
+
+1. Scan every line for Arabic script (except ﷺ)
+2. If any appears, replace the full Arabic span:
+   - Names/technical terms → Latin transliteration
+   - All other spans → English
+3. Rescan line-by-line and globally
+4. Emit only when zero Arabic script remains
+
+## When to Use Master Prompt Alone
+
+Rarely. The master prompt is designed to be **stacked** with specialized add-ons. Use it alone only when:
+
+- Creating custom domain-specific add-ons
+- Translating texts that don't fit any specialized category
+- Testing base-layer behavior
+
+## Stack with Specialized Prompts
+
+```typescript
+import { stackPrompts, getMasterPrompt } from 'wobble-bibble';
+
+// Create custom stacked prompt
+const customAddon = `
+CUSTOM RULE: Preserve poetic meter...
+`;
+
+const stackedPrompt = stackPrompts(getMasterPrompt(), customAddon);
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Specialized Prompts" icon="layer-group" href="/prompts/hadith">
+    Explore domain-specific prompt add-ons
+  </Card>
+  
+  <Card title="Prompt API" icon="code" href="/api-reference/prompts">
+    Learn the complete prompt management API
+  </Card>
+</CardGroup>

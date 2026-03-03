@@ -1,0 +1,248 @@
+---
+title: FixResult
+description: Result object returned by fixer functions
+---
+
+## Type definition
+
+```typescript
+type FixResult = {
+  text: string;
+  applied: string[];
+  requested?: string[];
+  skipped?: string[];
+  counts: Record<string, number>;
+};
+```
+
+## Properties
+
+<ResponseField name="text" type="string" required>
+  The fixed text with repairs applied.
+  
+  If no fixes were needed, this will be the same as the input text.
+</ResponseField>
+
+<ResponseField name="applied" type="string[]" required>
+  Array of fixer names that successfully made changes to the text.
+  
+  Example: `['fixCollapsedSpeakerLines']`
+  
+  Empty array if no fixes were applied.
+</ResponseField>
+
+<ResponseField name="requested" type="string[]">
+  Array of fixer names that were requested (only present in `fixAll` results).
+  
+  Shows which fixers were in the original request, even if they didn't make changes.
+</ResponseField>
+
+<ResponseField name="skipped" type="string[]">
+  Array of fixer names that were requested but not applied (only present in `fixAll` results).
+  
+  Fixers are skipped when they don't detect anything to fix.
+</ResponseField>
+
+<ResponseField name="counts" type="Record<string, number>" required>
+  Object mapping fixer names to the number of fixes made.
+  
+  Example:
+  ```typescript
+  {
+    "fixCollapsedSpeakerLines": 3
+  }
+  ```
+  
+  Value is `0` if the fixer ran but found nothing to fix.
+</ResponseField>
+
+## Usage examples
+
+### Single fixer result
+
+```typescript
+import { fixCollapsedSpeakerLines } from 'wobble-bibble';
+
+const text = `
+Questioner: First question? The Shaykh: Answer here.
+`;
+
+const result = fixCollapsedSpeakerLines(text, {
+  speakerLabels: ['Questioner', 'The Shaykh']
+});
+
+console.log(result.text);
+// Questioner: First question?
+// The Shaykh: Answer here.
+
+console.log(result.applied);
+// ['fixCollapsedSpeakerLines']
+
+console.log(result.counts);
+// { fixCollapsedSpeakerLines: 1 }
+
+console.log(result.requested);  // undefined (not present)
+console.log(result.skipped);    // undefined (not present)
+```
+
+### No fixes needed
+
+```typescript
+import { fixCollapsedSpeakerLines } from 'wobble-bibble';
+
+const alreadyFixed = `
+Questioner: First question?
+The Shaykh: Answer here.
+`;
+
+const result = fixCollapsedSpeakerLines(alreadyFixed, {
+  speakerLabels: ['Questioner', 'The Shaykh']
+});
+
+console.log(result.text === alreadyFixed);  // true (unchanged)
+console.log(result.applied);                 // [] (empty)
+console.log(result.counts);                  // { fixCollapsedSpeakerLines: 0 }
+```
+
+### Multiple fixes in one text
+
+```typescript
+import { fixCollapsedSpeakerLines } from 'wobble-bibble';
+
+const multipleCollapsed = `
+Line 1. Speaker A: Text. Speaker B: More text. Speaker C: Even more.
+`;
+
+const result = fixCollapsedSpeakerLines(multipleCollapsed, {
+  speakerLabels: ['Speaker A', 'Speaker B', 'Speaker C']
+});
+
+console.log(result.counts);
+// { fixCollapsedSpeakerLines: 2 }  (2 collapses fixed)
+```
+
+### Using with fixAll
+
+```typescript
+import { fixAll } from 'wobble-bibble';
+
+const text = `Some text with issues`;
+
+const result = fixAll(text, {
+  types: ['collapsed_speakers']
+});
+
+console.log(result.requested);
+// ['collapsed_speakers']  (what was requested)
+
+console.log(result.applied);
+// ['fixCollapsedSpeakerLines']  (what actually ran)
+
+console.log(result.skipped);
+// []  (nothing was skipped)
+```
+
+### Checking if fixes were applied
+
+```typescript
+import { fixCollapsedSpeakerLines } from 'wobble-bibble';
+
+const result = fixCollapsedSpeakerLines(text);
+
+if (result.applied.length > 0) {
+  console.log(`Applied ${result.applied.length} fixer(s)`);
+  console.log(`Made ${result.counts.fixCollapsedSpeakerLines} fix(es)`);
+  
+  // Use the fixed text
+  await saveTranslation(result.text);
+} else {
+  console.log('No fixes needed');
+}
+```
+
+### Counting total fixes
+
+```typescript
+function getTotalFixes(result: FixResult): number {
+  return Object.values(result.counts).reduce((sum, count) => sum + count, 0);
+}
+
+const result = fixCollapsedSpeakerLines(text);
+const total = getTotalFixes(result);
+
+console.log(`Total fixes: ${total}`);
+```
+
+## Workflow patterns
+
+### Validate → Fix → Revalidate
+
+```typescript
+import { validateTranslationResponse, fixAll } from 'wobble-bibble';
+
+const segments = [{ id: 'P1', text: 'نص عربي' }];
+const response = 'P1 - Translation with issues';
+
+// 1. Initial validation
+const validation = validateTranslationResponse(segments, response);
+
+if (validation.errors.length > 0) {
+  // 2. Collect fixable error types
+  const fixableTypes = validation.errors
+    .map(e => e.type)
+    .filter(type => type === 'collapsed_speakers');
+  
+  if (fixableTypes.length > 0) {
+    // 3. Apply fixes
+    const fixResult = fixAll(response, { types: fixableTypes });
+    
+    console.log(`Applied: ${fixResult.applied.join(', ')}`);
+    console.log(`Total fixes: ${Object.values(fixResult.counts).reduce((a, b) => a + b, 0)}`);
+    
+    // 4. Revalidate
+    const revalidation = validateTranslationResponse(segments, fixResult.text);
+    
+    console.log(`Errors reduced: ${validation.errors.length} → ${revalidation.errors.length}`);
+  }
+}
+```
+
+### Logging fix details
+
+```typescript
+import { fixCollapsedSpeakerLines, type FixResult } from 'wobble-bibble';
+
+function logFixResult(result: FixResult) {
+  if (result.applied.length === 0) {
+    console.log('✓ No fixes needed');
+    return;
+  }
+  
+  console.log('🔧 Fixes applied:');
+  for (const fixer of result.applied) {
+    const count = result.counts[fixer] || 0;
+    console.log(`  - ${fixer}: ${count} fix(es)`);
+  }
+  
+  if (result.skipped && result.skipped.length > 0) {
+    console.log('⏭ Fixers skipped:');
+    for (const fixer of result.skipped) {
+      console.log(`  - ${fixer}`);
+    }
+  }
+}
+
+const result = fixCollapsedSpeakerLines(text);
+logFixResult(result);
+```
+
+## Related types
+
+- [FixConfig](/api/types/fix-config) - Configuration for fixers
+- [FixAllOptions](/api/fixers/fix-all) - Options for batch fixing
+- [ValidationError](/api/types/validation-error) - Errors that fixers can repair
+
+## Related functions
+
+- [fixCollapsedSpeakerLines](/api/fixers/fix-collapsed-speaker-lines) - Returns FixResult
+- [fixAll](/api/fixers/fix-all) - Returns FixResult with requested/skipped fields

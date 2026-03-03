@@ -1,0 +1,263 @@
+---
+title: "Tafsir Prompt"
+description: "For translating Quranic exegesis with verse citations and theological attributes"
+---
+
+The tafsir prompt is specialized for translating **Quranic commentary** (tafsir) - exegetical works that explain verses, discuss theological attributes, and include grammatical analysis.
+
+## What It's For
+
+Use the tafsir prompt when translating:
+
+- Classical tafsir works (Ibn Kathir, Tabari, Qurtubi, etc.)
+- Quranic commentary with verse citations
+- Texts discussing Allah's attributes
+- Works with grammatical (i'rab) analysis
+- Poetry cited in exegesis
+
+<Note>
+The tafsir prompt is **automatically stacked** on top of the master prompt. You get all master rules plus tafsir-specific guidance.
+</Note>
+
+## Access the Tafsir Prompt
+
+```typescript
+import { getPrompt } from 'wobble-bibble';
+
+const tafsirPrompt = getPrompt('tafsir');
+console.log(tafsirPrompt.name); // "Tafsir"
+console.log(tafsirPrompt.content); // Master + tafsir rules combined
+```
+
+## Verse Citations
+
+### Numeric Format Only
+
+Use `[surah:ayah]` format. Do **not** include surah names unless the Arabic explicitly includes them.
+
+**Wrong:** `{And establish prayer} [Al-Baqarah 2:43]`  
+**Right:** `{And establish prayer} [2:43]`
+
+### Quoted Quranic Text
+
+When translating quoted Quran, use braces `{...}` followed by citation:
+
+```
+{Say: He is Allah, the One} [112:1]
+```
+
+<Warning>
+**Critical:** Do NOT output Arabic script for Quranic text. Translate into English and put in braces.
+</Warning>
+
+**Wrong:** `{قُلْ هُوَ اللَّهُ أَحَدٌ} [112:1]`  
+**Right:** `{Say: He is Allah, the One} [112:1]`
+
+## Theological Attributes
+
+The tafsir prompt handles Allah's attributes according to the **author's theological position**.
+
+### Mirror the Author's Theology
+
+<Note>
+**Critical principle:** Translate attributes **exactly as the author intends**. Do not add metaphorical reinterpretation unless the author does.
+</Note>
+
+### Literal vs. Figurative
+
+| Author School | Attribute Handling | Example |
+|---------------|-------------------|----------|
+| Salafi/Athari | Literal affirmation | "Allah's Hand" (literal) |
+| Ash'ari/Maturidi | Metaphorical | "Allah's power" (if author uses this) |
+
+**Source (Athari author):**
+```
+يد الله حقيقية وليست مجازية
+```
+
+**Output:**
+```
+Allah's Hand is real and not metaphorical
+```
+
+**Source (Ash'ari author):**
+```
+المراد باليد القدرة
+```
+
+**Output:**
+```
+What is meant by the Hand is the Power
+```
+
+### Common Attributes
+
+- Hand (يد)
+- Face (وجه)
+- Eyes (أعين / عينان)
+- Rising/Ascending (استواء)
+- Descending (نزول)
+
+Translate according to the author's methodology - do not impose a different theological interpretation.
+
+## Grammatical (I'rab) Terms
+
+When Arabic grammar is discussed, use these mappings:
+
+| Arabic | English |
+|--------|----------|
+| مبتدأ | Subject |
+| خبر | Predicate |
+| فاعل | Agent/Doer |
+| مفعول | Object |
+
+**Example:**
+
+**Source:**
+```
+"الله" مبتدأ و"أحد" خبر
+```
+
+**Output:**
+```
+"Allah" is the subject (mubtadaʾ) and "One" is the predicate (khabar)
+```
+
+## Prophet Names
+
+Use Arabic name forms with full ALA-LC diacritics:
+
+| Common English | Required Form |
+|----------------|---------------|
+| Moses | Mūsá |
+| Jesus | ʿĪsá |
+| David | Dāwūd |
+| Joseph | Yūsuf |
+| Abraham | Ibrāhīm |
+| Noah | Nūḥ |
+| Solomon | Sulaymān |
+
+**Wrong:** "Jesus said..."  
+**Right:** "ʿĪsá said..."
+
+## Poetry Formatting
+
+When tafsir includes Arabic poetry for linguistic evidence:
+
+### Line Breaks
+
+Preserve line structure - one English line per Arabic line:
+
+**Wrong (merged):**
+```
+He said: "The night is long and will not dawn, and what difference if you are troubled or secure."
+```
+
+**Right (preserved):**
+```
+He said:
+"The night is long and will not dawn,
+And what difference if you are troubled or secure."
+```
+
+### No Bullets
+
+Do not add bullet points or numbering to poetry lines.
+
+### Prioritize Structure Over Rhyme
+
+Focus on **literal grammar** and **word order**, not recreating Arabic rhyme scheme.
+
+**Wrong:** Attempting to rhyme English translation  
+**Right:** Literal structure preserving Arabic grammatical patterns
+
+## When to Use
+
+✅ **Use `tafsir` prompt for:**
+- Quranic commentary (tafsir)
+- Works explaining specific verses
+- Texts with theological attribute discussions
+- Exegesis with grammatical analysis
+- Poetry cited in Quranic context
+
+❌ **Don't use for:**
+- Hadith collections → Use `hadith`
+- Legal rulings → Use `fiqh`
+- Mixed scholarly works → Use `encyclopedia_mixed`
+
+## Common Pitfalls
+
+### 1. Adding Surah Names
+
+❌ Wrong: `[Surah Al-Baqarah 2:255]`  
+✅ Right: `[2:255]`
+
+### 2. Keeping Arabic Quranic Text
+
+❌ Wrong: `{قُلْ هُوَ اللَّهُ أَحَدٌ}`  
+✅ Right: `{Say: He is Allah, the One}`
+
+### 3. Imposing Theological Interpretation
+
+❌ Wrong: Changing "Hand" to "power" when author uses literal sense  
+✅ Right: Mirror the author's exact theological position
+
+### 4. English Prophet Names
+
+❌ Wrong: `Moses`, `Jesus`, `David`  
+✅ Right: `Mūsá`, `ʿĪsá`, `Dāwūd`
+
+### 5. Merging Poetry Lines
+
+❌ Wrong: All lines in one paragraph  
+✅ Right: One English line per Arabic line
+
+## Example Output
+
+**Input segment:**
+```
+P789 - قوله تعالى: {الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ}. "الحمد" مبتدأ و"لله" خبر. والمعنى: الثناء على الله بصفاته الحسنى. وقد قال بعض السلف: يد الله حقيقية.
+```
+
+**Expected output:**
+```
+P789 - His statement, exalted is He: {Praise be to Allah, Lord of the worlds}. "Praise" is the subject (mubtadaʾ) and "to Allah" is the predicate (khabar). The meaning is: Laudation of Allah with His beautiful attributes. Some of the predecessors (salaf) said: Allah's Hand is real.
+```
+
+## Integration with Validation
+
+```typescript
+import { getPrompt, validateTranslationResponse } from 'wobble-bibble';
+
+const prompt = getPrompt('tafsir');
+
+// Send prompt.content to LLM...
+const llmOutput = "P789 - His statement, exalted is He...";
+
+// Validate the response
+const validation = validateTranslationResponse(llmOutput, sourceSegments);
+
+if (!validation.isValid) {
+  console.error('Validation errors:', validation.errors);
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Hadith Prompt" icon="book-open" href="/prompts/hadith">
+    For hadith collections often cited in tafsir
+  </Card>
+  
+  <Card title="Fiqh Prompt" icon="scale-balanced" href="/prompts/fiqh">
+    For legal rulings derived from Quranic verses
+  </Card>
+  
+  <Card title="Encyclopedia Mixed" icon="layer-group" href="/prompts/encyclopedia-mixed">
+    For works mixing tafsir with other genres
+  </Card>
+  
+  <Card title="Validation Guide" icon="circle-check" href="/validation/overview">
+    Learn how outputs are validated
+  </Card>
+</CardGroup>

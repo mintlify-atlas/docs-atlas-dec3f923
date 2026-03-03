@@ -1,0 +1,163 @@
+---
+title: parseTranslations
+description: Parse bulk translation text into a Map for efficient O(1) lookup
+---
+
+## Overview
+
+Parses bulk translation text into a `Map` structure for efficient O(1) lookup by ID. Handles multi-line translations where subsequent non-marker lines belong to the previous ID.
+
+## Function Signature
+
+```typescript
+parseTranslations(rawText: string): {
+  count: number;
+  translationMap: Map<string, string>;
+}
+```
+
+## Parameters
+
+<ParamField path="rawText" type="string" required>
+  Raw translation text containing translations in the format "ID - Translation text". Does not need to be pre-normalized.
+</ParamField>
+
+## Returns
+
+<ResponseField name="count" type="number">
+  The total number of unique translations parsed (same as `translationMap.size`).
+</ResponseField>
+
+<ResponseField name="translationMap" type="Map<string, string>">
+  Map where keys are segment IDs and values are the translated text (with ID prefix removed and whitespace trimmed).
+</ResponseField>
+
+## Usage
+
+### Basic Example
+
+```typescript
+import { parseTranslations } from 'wobble-bibble';
+
+const response = `P1 - Allah is the Greatest
+P2 - In the name of Allah, the Most Gracious, the Most Merciful`;
+
+const { count, translationMap } = parseTranslations(response);
+
+console.log(count); // 2
+console.log(translationMap.get('P1')); // 'Allah is the Greatest'
+console.log(translationMap.get('P2')); // 'In the name of Allah, the Most Gracious, the Most Merciful'
+```
+
+### Multi-line Translations
+
+```typescript
+// Handles translations that span multiple lines
+const response = `P1 - This is a long translation
+that continues on the next line
+and even another line
+P2 - Second translation`;
+
+const { translationMap } = parseTranslations(response);
+
+console.log(translationMap.get('P1'));
+// 'This is a long translation
+// that continues on the next line
+// and even another line'
+```
+
+### Efficient Lookup
+
+```typescript
+const response = getLLMResponse(); // Assume this returns 1000 translations
+const { translationMap } = parseTranslations(response);
+
+// O(1) lookup performance regardless of number of translations
+const translation = translationMap.get('P500');
+
+if (translation) {
+  console.log('Found:', translation);
+} else {
+  console.log('Translation not found');
+}
+```
+
+### Applying Translations to Original Segments
+
+```typescript
+import { parseTranslations } from 'wobble-bibble';
+
+const segments = [
+  { id: 'P1', text: 'الله أكبر' },
+  { id: 'P2', text: 'بسم الله' }
+];
+
+const llmResponse = `P1 - Allah is the Greatest
+P2 - In the name of Allah`;
+
+const { translationMap } = parseTranslations(llmResponse);
+
+const translated = segments.map(segment => ({
+  ...segment,
+  translation: translationMap.get(segment.id) || '[missing]'
+}));
+
+console.log(translated);
+// [
+//   { id: 'P1', text: 'الله أكبر', translation: 'Allah is the Greatest' },
+//   { id: 'P2', text: 'بسم الله', translation: 'In the name of Allah' }
+// ]
+```
+
+## How It Works
+
+1. **Normalization**: Automatically normalizes the input using `normalizeTranslationText`
+
+2. **Parsing**: Uses `parseTranslationsInOrder` internally to extract ID-translation pairs
+
+3. **Map Construction**: Builds a Map for O(1) lookup performance
+
+**Note**: If duplicate IDs exist in the input, only the **last occurrence** is retained in the Map.
+
+## Duplicate ID Behavior
+
+```typescript
+const response = `P1 - First translation
+P1 - Second translation`;
+
+const { count, translationMap } = parseTranslations(response);
+
+console.log(count); // 1 (only unique IDs)
+console.log(translationMap.get('P1')); // 'Second translation' (last wins)
+```
+
+If you need to preserve duplicates, use [`parseTranslationsInOrder`](/api/text-utils/parse-translations-in-order) instead.
+
+## When to Use
+
+Use `parseTranslations` when:
+
+- You need fast lookup of translations by ID
+- Working with large translation batches (100+ segments)
+- Building translation caches or databases
+- Duplicate IDs should not appear in your data
+- You want a simple count of translations
+
+**Don't use** when:
+- You need to preserve duplicate IDs → use `parseTranslationsInOrder`
+- You need to preserve exact ordering → use `parseTranslationsInOrder`
+- You only need IDs → use `extractTranslationIds`
+
+## Performance Characteristics
+
+- **Parsing**: O(n) where n is the length of the text
+- **Lookup**: O(1) constant time
+- **Memory**: O(m) where m is the number of unique translations
+
+For datasets with thousands of translations, the Map structure provides significant performance benefits over array-based searching.
+
+## Related Functions
+
+- [`parseTranslationsInOrder`](/api/text-utils/parse-translations-in-order) - Preserves order and duplicates
+- [`extractTranslationIds`](/api/text-utils/extract-translation-ids) - Get only the IDs
+- [`normalizeTranslationText`](/api/text-utils/normalize-translation-text) - Used internally for normalization

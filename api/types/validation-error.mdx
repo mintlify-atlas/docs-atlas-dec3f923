@@ -1,0 +1,170 @@
+---
+title: ValidationError
+description: A single validation error with location range and metadata
+---
+
+## Type definition
+
+```typescript
+type ValidationError = {
+  type: ValidationErrorType;
+  message: string;
+  range: Range;
+  matchText: string;
+  id?: string;
+  ruleId?: string;
+};
+```
+
+## Properties
+
+<ResponseField name="type" type="ValidationErrorType" required>
+  Machine-readable error type. One of 13 possible values:
+  
+  - `invalid_marker_format`
+  - `no_valid_markers`
+  - `newline_after_id`
+  - `duplicate_id`
+  - `invented_id`
+  - `missing_id_gap`
+  - `collapsed_speakers`
+  - `truncated_segment`
+  - `arabic_leak`
+  - `empty_parentheses`
+  - `length_mismatch`
+  - `all_caps`
+  - `multiword_translit_without_gloss`
+</ResponseField>
+
+<ResponseField name="message" type="string" required>
+  Human-readable error description. Includes context about what went wrong.
+  
+  Example: `"Arabic script detected: \"الله\""`
+</ResponseField>
+
+<ResponseField name="range" type="Range" required>
+  Character position range in the raw response string where the error occurred.
+  
+  ```typescript
+  type Range = { start: number; end: number };
+  ```
+  
+  The `end` index is exclusive. Use these indices to highlight errors in UI.
+</ResponseField>
+
+<ResponseField name="matchText" type="string" required>
+  The exact text that triggered the error. Extracted from the response using the `range`.
+  
+  Example: `"الله"` for an `arabic_leak` error
+</ResponseField>
+
+<ResponseField name="id" type="string">
+  Optional segment ID where the error occurred. Present when the error can be associated with a specific segment.
+  
+  Example: `"P1234"`
+</ResponseField>
+
+<ResponseField name="ruleId" type="string">
+  Optional stable rule identifier for tooling/triage. May be more specific than `type`.
+  
+  Used internally for tracking validation rules.
+</ResponseField>
+
+## Usage examples
+
+### Highlighting errors in UI
+
+```typescript
+import { validateTranslationResponse } from 'wobble-bibble';
+
+const segments = [
+  { id: 'P1', text: 'قال الله تعالى' }
+];
+
+const response = 'P1 - Allah تعالى said';
+const result = validateTranslationResponse(segments, response);
+
+for (const error of result.errors) {
+  console.log(error.type);       // 'arabic_leak'
+  console.log(error.message);    // 'Arabic script detected: "تعالى"'
+  console.log(error.matchText);  // 'تعالى'
+  console.log(error.range);      // { start: 9, end: 13 }
+  console.log(error.id);         // 'P1'
+  
+  // Highlight in UI using range
+  const before = response.slice(0, error.range.start);
+  const highlighted = response.slice(error.range.start, error.range.end);
+  const after = response.slice(error.range.end);
+}
+```
+
+### Grouping errors by type
+
+```typescript
+const errorsByType = new Map<string, ValidationError[]>();
+
+for (const error of result.errors) {
+  const errors = errorsByType.get(error.type) || [];
+  errors.push(error);
+  errorsByType.set(error.type, errors);
+}
+
+// Show critical errors first
+const criticalTypes = ['invented_id', 'duplicate_id', 'missing_id_gap'];
+for (const type of criticalTypes) {
+  const errors = errorsByType.get(type);
+  if (errors) {
+    console.log(`${type}: ${errors.length} errors`);
+  }
+}
+```
+
+### Filtering by segment
+
+```typescript
+function getErrorsForSegment(errors: ValidationError[], segmentId: string) {
+  return errors.filter(e => e.id === segmentId);
+}
+
+const p1Errors = getErrorsForSegment(result.errors, 'P1');
+console.log(`Segment P1 has ${p1Errors.length} errors`);
+```
+
+## Error range visualization
+
+```typescript
+function visualizeError(response: string, error: ValidationError): void {
+  const lines = response.split('\n');
+  let charCount = 0;
+  let lineNum = 0;
+  
+  // Find line containing error
+  for (let i = 0; i < lines.length; i++) {
+    const lineLength = lines[i].length + 1; // +1 for \n
+    if (charCount + lineLength > error.range.start) {
+      lineNum = i;
+      break;
+    }
+    charCount += lineLength;
+  }
+  
+  const line = lines[lineNum];
+  const startInLine = error.range.start - charCount;
+  const endInLine = error.range.end - charCount;
+  
+  console.log(line);
+  console.log(' '.repeat(startInLine) + '^'.repeat(endInLine - startInLine));
+  console.log(`${error.type}: ${error.message}`);
+}
+```
+
+## Related types
+
+- [ValidationErrorType](/api/validation/validation-error-type-info) - All possible error type values
+- [ValidationConfig](/api/types/validation-config) - Configure error detection thresholds
+- [ValidationResponseResult](/api/validation/validate-translation-response) - Contains array of errors
+
+## Related functions
+
+- [validateTranslationResponse](/api/validation/validate-translation-response) - Produces validation errors
+- [VALIDATION_ERROR_TYPE_INFO](/api/validation/validation-error-type-info) - Human-readable error descriptions

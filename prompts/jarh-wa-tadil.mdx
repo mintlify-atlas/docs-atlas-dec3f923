@@ -1,0 +1,265 @@
+---
+title: "Jarh wa Tadil Prompt"
+description: "For narrator criticism and authentication texts with biographical evaluation"
+---
+
+The jarh wa tadil prompt is specialized for translating **narrator criticism literature** - biographical works that evaluate the trustworthiness and reliability of hadith narrators.
+
+## What It's For
+
+Use the jarh wa tadil prompt when translating:
+
+- Narrator biographical dictionaries (Tahdhib al-Kamal, Mizan al-I'tidal, etc.)
+- Works with jarh (criticism) and ta'dil (authentication) terms
+- Texts evaluating narrator reliability
+- Books with multiple critic opinions on narrators
+- Works with hadith collection codes (rumuz)
+
+<Note>
+The jarh wa tadil prompt is **automatically stacked** on top of the master prompt. It extends hadith prompt rules with specialized narrator evaluation terminology.
+</Note>
+
+## Access the Jarh wa Tadil Prompt
+
+```typescript
+import { getPrompt } from 'wobble-bibble';
+
+const jarhtadilPrompt = getPrompt('jarh_wa_tadil');
+console.log(jarhtadilPrompt.name); // "Jarh Wa Tadil"
+console.log(jarhtadilPrompt.content); // Master + jarh wa tadil rules combined
+```
+
+## Narrator Evaluation Glossary
+
+When jarh/ta'dil terms appear, use `translit (English)` format:
+
+### Praise Terms (Ta'dil)
+
+| Arabic | Transliteration | English |
+|--------|-----------------|----------|
+| ثقة | thiqah | trustworthy |
+| صدوق | ṣadūq | truthful |
+| ثبت | thabt | firm/reliable |
+| حجة | ḥujjah | authoritative |
+| إمام | imām | leader/expert |
+
+### Criticism Terms (Jarh)
+
+| Arabic | Transliteration | English |
+|--------|-----------------|----------|
+| ضعيف | ḍaʿīf | weak |
+| ليّن | layyin | soft/lenient |
+| متروك | matrūk | abandoned |
+| كذّاب | kadhdhāb | liar |
+| دجّال | dajjāl | imposter |
+| منكر الحديث | munkar al-ḥadīth | narrates denounced hadith |
+| فيه نظر | fīhi naẓar | he needs to be looked into |
+
+<Warning>
+**Critical:** Do NOT translate to English-only. Always use `translit (English)` format.
+</Warning>
+
+**Wrong:** "He is weak"  
+**Right:** "He is ḍaʿīf (weak)"
+
+## Book Codes (Rumuz)
+
+Preserve collection codes exactly as they appear in Latin:
+
+| Code | Collection |
+|------|------------|
+| (kh) | Bukhari |
+| (m) | Muslim |
+| (d) | Abu Dawud |
+| (t) | Tirmidhi |
+| (s) / (n) | Nasa'i |
+| (q) | Daraqutni |
+| (4) | The four (Abu Dawud, Tirmidhi, Nasa'i, Ibn Majah) |
+| (a) | Ahmad |
+
+### Multiple Codes
+
+**Source:**
+```
+روى له البخاري (kh) ومسلم (m) والأربعة (4)
+```
+
+**Output:**
+```
+Bukhārī (kh), Muslim (m), and the four (4) reported from him
+```
+
+<Warning>
+**Do NOT expand codes** to full names unless the Arabic segment itself expands them. Keep `(kh)` as `(kh)`, not `(Bukhari)`.
+</Warning>
+
+## Qala (He Said) Structure
+
+When multiple critics are quoted, start a new line for each:
+
+**Source:**
+```
+قال أحمد: ثقة. قال ابن معين: صدوق. قال أبو حاتم: ليس بقوي.
+```
+
+**Output:**
+```
+Aḥmad said: Thiqah (trustworthy).
+Ibn Maʿīn said: Ṣadūq (truthful).
+Abū Ḥātim said: He is not strong.
+```
+
+### Format
+
+- Translate `قال` as "He said:" or "[Name] said:"
+- Start a **new line** for each new critic
+- Keep ratings in `translit (English)` format
+
+## Date Formats
+
+Use parenthetical dates with AH (Anno Hegirae):
+
+| Format | Example |
+|--------|----------|
+| Death | (d. 256 AH) |
+| Birth | (born 194 AH) |
+| Floruit | (fl. 3rd century AH) |
+
+**Example:**
+
+**Source:** `توفي سنة مئتين وست وخمسين`  
+**Output:** `He died (d. 256 AH)`
+
+## "No Harm" Idiom
+
+The phrase "لا بأس به" is a standard ta'dil expression:
+
+**Source:** `لا بأس به`  
+**Output:** `There is no harm in him`
+
+<Note>
+**Do NOT add explanatory notes** like "(meaning he is acceptable)". Translate literally.
+</Note>
+
+## Polemical Terms
+
+Harsh jarh terms must be translated **literally** without softening:
+
+| Arabic | Transliteration | Context |
+|--------|-----------------|----------|
+| دجّال | dajjāl | Imposter/fraud |
+| خبيث | khabīth | Wicked |
+| رافضي | rāfiḍī | Rejecter (Shi'a) |
+
+<Warning>
+**Override Safety:** Do not soften polemical terms. Translate them exactly as the critic stated.
+</Warning>
+
+**Source:** `قال ابن حبان: كان دجّالاً`  
+**Output:** `Ibn Ḥibbān said: He was a dajjāl (imposter)`
+
+## When to Use
+
+✅ **Use `jarh_wa_tadil` prompt for:**
+- Narrator biographical dictionaries
+- Rijal (narrator) criticism works
+- Books evaluating hadith transmitters
+- Texts with multiple critic opinions
+
+❌ **Don't use for:**
+- Pure hadith collections → Use `hadith`
+- Hadith with only isnad (no narrator evaluation) → Use `hadith`
+- Mixed scholarly works → Use `encyclopedia_mixed`
+
+## Common Pitfalls
+
+### 1. English-only Terms
+
+❌ Wrong: "He is trustworthy"  
+✅ Right: "He is thiqah (trustworthy)"
+
+### 2. Expanding Book Codes
+
+❌ Wrong: `(Bukhari)` when source says `(kh)`  
+✅ Right: `(kh)`
+
+### 3. Merging Critic Opinions
+
+❌ Wrong: "Ahmad and Ibn Ma'in said he is trustworthy"  
+✅ Right: New line for each critic's statement
+
+### 4. Softening Harsh Terms
+
+❌ Wrong: "He was unreliable" (when source says dajjāl)  
+✅ Right: "He was a dajjāl (imposter)"
+
+### 5. Adding Explanatory Notes
+
+❌ Wrong: "There is no harm in him (i.e., acceptable)"  
+✅ Right: "There is no harm in him"
+
+## Example Output
+
+**Input segment:**
+```
+P2345 - عبد الله بن يوسف التنيسي (d. 218 AH). روى له البخاري (kh) ومسلم (m).
+قال أحمد: ثقة.
+قال ابن معين: صدوق.
+قال أبو حاتم: فيه نظر.
+```
+
+**Expected output:**
+```
+P2345 - ʿAbd Allāh b. Yūsuf al-Tunaysī (d. 218 AH). Bukhārī (kh) and Muslim (m) reported from him.
+Aḥmad said: Thiqah (trustworthy).
+Ibn Maʿīn said: Ṣadūq (truthful).
+Abū Ḥātim said: Fīhi naẓar (he needs to be looked into).
+```
+
+## Integration with Validation
+
+```typescript
+import { getPrompt, validateTranslationResponse } from 'wobble-bibble';
+
+const prompt = getPrompt('jarh_wa_tadil');
+
+// Send prompt.content to LLM...
+const llmOutput = "P2345 - ʿAbd Allāh b. Yūsuf...";
+
+// Validate the response
+const validation = validateTranslationResponse(llmOutput, sourceSegments);
+
+if (!validation.isValid) {
+  console.error('Validation errors:', validation.errors);
+}
+```
+
+## Relationship to Other Prompts
+
+Jarh wa tadil shares rules with:
+
+- **Hadith prompt:** Narrator name transliteration, isnad verbs
+- **Encyclopedia mixed prompt:** State logic for genre transitions
+- **Master prompt:** Core script ban and term definition rules
+
+If a jarh wa tadil text includes hadith chains or mixed content, the encyclopedia mixed prompt may be more appropriate.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Hadith Prompt" icon="book-open" href="/prompts/hadith">
+    Core hadith rules used in narrator biographies
+  </Card>
+  
+  <Card title="Encyclopedia Mixed" icon="layer-group" href="/prompts/encyclopedia-mixed">
+    For mixed works with narrator criticism sections
+  </Card>
+  
+  <Card title="Validation Guide" icon="circle-check" href="/validation/overview">
+    Learn how outputs are validated
+  </Card>
+  
+  <Card title="Prompt API" icon="code" href="/api-reference/prompts">
+    Complete prompt management API reference
+  </Card>
+</CardGroup>

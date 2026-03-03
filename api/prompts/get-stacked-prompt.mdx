@@ -1,0 +1,111 @@
+---
+title: getStackedPrompt
+description: Get the raw stacked prompt text for a specific prompt ID
+---
+
+## Function Signature
+
+```typescript
+function getStackedPrompt(id: PromptId): string
+```
+
+Convenience method to retrieve just the prompt content string for a specific prompt ID. For addon prompts, automatically stacks the master prompt with the specialized addon. This is a shorthand for `getPrompt(id).content`.
+
+## Parameters
+
+<ParamField path="id" type="PromptId" required>
+  The prompt ID to retrieve. Must be one of the available prompt IDs:
+  - `'master_prompt'` - Base prompt for all translations
+  - `'encyclopedia_mixed'` - For mixed-discipline scholarly works
+  - `'fatawa'` - For Islamic legal rulings and Q&A
+  - `'fiqh'` - For Islamic jurisprudence
+  - `'hadith'` - For hadith narrations
+  - `'jarh_wa_tadil'` - For narrator criticism and praise
+  - `'tafsir'` - For Quranic commentary
+  - `'usul_al_fiqh'` - For principles of Islamic jurisprudence
+</ParamField>
+
+## Returns
+
+<ResponseField name="content" type="string">
+  The stacked prompt content string. For master prompt, returns as-is. For addon prompts, returns master + addon combined with a newline separator.
+</ResponseField>
+
+## Example
+
+```typescript
+import { getStackedPrompt } from 'wobble-bibble';
+
+// Get hadith prompt content
+const hadithContent = getStackedPrompt('hadith');
+
+// Use directly with OpenAI
+const completion = await openai.chat.completions.create({
+  model: 'gpt-4',
+  messages: [
+    {
+      role: 'system',
+      content: hadithContent
+    },
+    {
+      role: 'user',
+      content: 'P1: قال رسول الله صلى الله عليه وسلم: "إنما الأعمال بالنيات"'
+    }
+  ]
+});
+
+// Use with Anthropic
+const message = await anthropic.messages.create({
+  model: 'claude-3-5-sonnet-20241022',
+  system: getStackedPrompt('fiqh'),
+  messages: [
+    {
+      role: 'user',
+      content: 'P1: باب الصلاة'
+    }
+  ]
+});
+```
+
+## Comparison with getPrompt
+
+```typescript
+import { getPrompt, getStackedPrompt } from 'wobble-bibble';
+
+// These are equivalent:
+const content1 = getStackedPrompt('hadith');
+const content2 = getPrompt('hadith').content;
+
+console.log(content1 === content2); // true
+
+// Use getPrompt when you need metadata:
+const prompt = getPrompt('hadith');
+console.log(prompt.name);      // "Hadith"
+console.log(prompt.isMaster);  // false
+
+// Use getStackedPrompt when you only need the text:
+const text = getStackedPrompt('hadith');
+// Just the string content, no metadata
+```
+
+## Errors
+
+Throws an `Error` if the prompt ID is not found:
+
+```typescript
+try {
+  const content = getStackedPrompt('invalid_id' as PromptId);
+} catch (error) {
+  console.error(error.message); // "Prompt not found: invalid_id"
+}
+```
+
+<Tip>
+  Use this function when you only need the prompt text and don't need metadata like the name or isMaster flag. It's more concise than calling `getPrompt(id).content`.
+</Tip>
+
+## Related
+
+- [getPrompt](/api/prompts/get-prompt) - Get full prompt object with metadata
+- [getMasterPrompt](/api/prompts/get-master-prompt) - Get only the master prompt
+- [stackPrompts](/api/prompts/stack-prompts) - Manually stack prompts

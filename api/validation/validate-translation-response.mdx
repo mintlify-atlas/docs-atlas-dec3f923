@@ -1,0 +1,205 @@
+---
+title: validateTranslationResponse
+description: Validate an LLM translation response against a set of Arabic source segments
+---
+
+## Function Signature
+
+```typescript
+export const validateTranslationResponse = (
+    segments: Segment[],
+    response: string,
+    options?: { rules?: ValidationRule[]; config?: Partial<ValidationConfig> },
+): ValidationResponseResult
+```
+
+Validates an LLM translation response against a set of Arabic source segments. Returns a list of typed validation errors that the caller can map to UI severities.
+
+## Parameters
+
+<ParamField path="segments" type="Segment[]" required>
+  Array of source segments (Arabic text with IDs). May be the full corpus - the validator automatically reduces to only those IDs parsed from the response.
+  
+  Each segment has shape: `{ id: string; text: string }`
+</ParamField>
+
+<ParamField path="response" type="string" required>
+  The raw LLM translation response text containing segment markers in the format `ID - Translation text`.
+  
+  The validator normalizes this input (splits merged markers, normalizes line endings) before validation.
+</ParamField>
+
+<ParamField path="options.rules" type="ValidationRule[]">
+  Custom validation rules to apply. If not provided, all default rules are used.
+  
+  Default rules include: `invalid_marker_format`, `newline_after_id`, `truncated_segment`, `duplicate_id`, `invented_id`, `missing_id_gap`, `arabic_leak`, `empty_parentheses`, `length_mismatch`, `all_caps`, `collapsed_speakers`, `multiword_translit_without_gloss`
+</ParamField>
+
+<ParamField path="options.config" type="Partial<ValidationConfig>">
+  Configuration object for validation rules.
+  
+  - `allCapsWordRunThreshold` (number, default: 5): Minimum number of consecutive ALL CAPS words to trigger an `all_caps` error
+</ParamField>
+
+## Return Value
+
+<ResponseField name="normalizedResponse" type="string">
+  The normalized version of the input response (merged markers split, line endings normalized, escaped brackets removed).
+</ResponseField>
+
+<ResponseField name="parsedIds" type="string[]">
+  Array of segment IDs successfully parsed from the response (in order of appearance).
+</ResponseField>
+
+<ResponseField name="errors" type="ValidationError[]">
+  Array of validation errors found. Each error contains:
+  
+  - `type` (ValidationErrorType): Machine-readable error type
+  - `message` (string): Human-readable error message
+  - `range` (Range): Character range `{ start: number; end: number }` in the raw response
+  - `matchText` (string): The text that triggered the error
+  - `id` (string, optional): The segment ID associated with this error
+  - `ruleId` (string, optional): Stable rule identifier for tooling/triage
+</ResponseField>
+
+## Behavior
+
+### Normalization
+The function normalizes the response before validation:
+- Splits merged markers (e.g., `helloP1 - Text` becomes `hello\nP1 - Text`)
+- Normalizes line endings
+- Removes escaped brackets (e.g., `\[` becomes `[`)
+
+### ID Validation
+- **No valid markers**: If no valid `ID - Text` patterns are found, returns a single `no_valid_markers` error
+- **Invented IDs**: Detects IDs in the response that don't exist in the source segments
+- **Duplicate IDs**: Flags IDs that appear more than once in the response
+- **Missing ID gaps**: Detects when the response contains IDs A and C but the corpus order includes B between them
+
+### Content Validation
+- **Arabic leak**: Detects Arabic script characters (except ﷺ which is allowed)
+- **Truncated segments**: Flags segments containing only `…`, `...`, or `[INCOMPLETE]`
+- **Length mismatch**: Checks if translation is too short relative to Arabic source (ratio-based heuristic, only for Arabic text ≥ 100 chars)
+- **Empty parentheses**: Detects excessive `()` patterns (> 3) indicating failed transliterations
+- **All caps**: Flags runs of N consecutive ALL CAPS words (configurable threshold)
+- **Collapsed speakers**: Detects speaker labels that appear mid-line instead of at line start
+- **Multi-word transliteration without gloss**: Flags patterns like `al-hajr fi al-madajīʿ` without immediate parenthetical gloss
+
+### Format Validation
+- **Invalid marker format**: Detects malformed markers (wrong ID shape, missing content after dash, dollar signs, etc.)
+- **Newline after ID**: Flags `ID -\nText` instead of `ID - Text`
+
+## Examples
+
+### Valid Response (No Errors)
+
+```typescript
+const segments = [
+  { id: 'P1', text: 'هذا نص عربي طويل يحتوي على محتوى كافٍ للترجمة' },
+  { id: 'P2', text: 'هذا نص عربي آخر' },
+];
+
+const response = `P1 - This is a sufficiently long English translation.
+P2 - This is another Arabic text.`;
+
+const result = validateTranslationResponse(segments, response);
+// result.errors.length === 0
+// result.parsedIds === ['P1', 'P2']
+```
+
+### Invented ID Error
+
+```typescript
+const segments = [{ id: 'P1', text: 'نص عربي' }];
+const response = `P1 - Valid translation.\nP2 - Invented.`;
+
+const result = validateTranslationResponse(segments, response);
+// result.errors[0].type === 'invented_id'
+// result.errors[0].message === 'Invented ID detected: "P2" - this ID does not exist in the source'
+```
+
+### Arabic Leak Error
+
+```typescript
+const segments = [{ id: 'P1', text: 'نعم' }];
+const response = `P1 - He quoted «واللاتي تخافون نشوزهن».`;
+
+const result = validateTranslationResponse(segments, response);
+// result.errors[0].type === 'arabic_leak'
+// result.errors[0].matchText === 'واللاتي تخافون نشوزهن'
+```
+
+### Allowed ﷺ Symbol
+
+```typescript
+const segments = [{ id: 'P1', text: 'نعم' }];
+const response = `P1 - Muḥammad ﷺ said many things.`;
+
+const result = validateTranslationResponse(segments, response);
+// result.errors.length === 0  // ﷺ is allowed
+```
+
+### Collapsed Speaker Labels
+
+```typescript
+const segments = [{
+  id: 'P1',
+  text: 'السائل: نعم\nالشيخ: نعم',
+}];
+
+const response = `P1 - Questioner: Yes.\nThe Shaykh: Yes. Questioner: Yes.`;
+
+const result = validateTranslationResponse(segments, response);
+// result.errors[0].type === 'collapsed_speakers'
+// result.errors[0].message includes 'Detected line-start labels: Questioner, The Shaykh'
+```
+
+### Missing ID Gap
+
+```typescript
+const segments = [
+  { id: 'P1', text: 'نص عربي طويل...' },
+  { id: 'P2', text: 'نص عربي طويل...' },
+  { id: 'P3', text: 'نص عربي طويل...' },
+];
+
+const response = `P1 - Translation.\nP3 - Translation.`;
+
+const result = validateTranslationResponse(segments, response);
+// result.errors[0].type === 'missing_id_gap'
+// result.errors[0].message === 'Missing segment ID detected between translated IDs: "P2"'
+```
+
+### Custom Configuration
+
+```typescript
+const segments = [{ id: 'P1', text: 'نعم' }];
+const response = `P1 - THIS IS LOUD NOW`;
+
+// Trigger all_caps with only 4 consecutive caps words
+const result = validateTranslationResponse(segments, response, {
+  config: { allCapsWordRunThreshold: 4 }
+});
+// result.errors[0].type === 'all_caps'
+```
+
+### Error Ranges
+
+All errors include character ranges that map to the original raw response:
+
+```typescript
+const segments = [{ id: 'P1', text: 'نص عربي طويل' }];
+const response = 'P1 - Hello الله.';
+
+const result = validateTranslationResponse(segments, response);
+const err = result.errors.find(e => e.type === 'arabic_leak');
+
+// err.matchText === 'الله'
+// err.range === { start: 11, end: 15 }
+// response.slice(err.range.start, err.range.end) === 'الله'
+```
+
+## See Also
+
+- [VALIDATION_ERROR_TYPE_INFO](/api/validation/validation-error-type-info) - Human-readable descriptions for all error types
+- [ValidationError](/api/types/validation-error) - Error object structure with all fields

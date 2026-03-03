@@ -1,0 +1,143 @@
+---
+title: getMasterPrompt
+description: Get the base master prompt content without any addon specialization
+---
+
+## Function Signature
+
+```typescript
+function getMasterPrompt(): string
+```
+
+Retrieves just the master prompt content. The master prompt contains the universal grounding rules that apply to all Islamic text translations, including:
+
+- No Arabic script except ﷺ
+- ALA-LC transliteration standards
+- ID integrity preservation
+- Plain text output (no Markdown)
+- Fidelity and accuracy constraints
+
+Use this function when you need to create custom prompt combinations or use a specialized addon that isn't in the library.
+
+## Parameters
+
+None.
+
+## Returns
+
+<ResponseField name="content" type="string">
+  The master prompt content string. This is the base prompt without any specialized addon rules.
+</ResponseField>
+
+## Example
+
+```typescript
+import { getMasterPrompt } from 'wobble-bibble';
+
+const masterPrompt = getMasterPrompt();
+
+console.log(masterPrompt);
+// Returns the full master prompt text with all base rules:
+// - Transliteration standards (ALA-LC)
+// - Arabic script restrictions
+// - ID preservation rules
+// - Output format constraints
+// - Fidelity guidelines
+```
+
+## Custom Addon Usage
+
+```typescript
+import { getMasterPrompt, stackPrompts } from 'wobble-bibble';
+
+// Create a custom addon for a specialized use case
+const customAddon = `
+## Additional Rules for Aqidah Texts
+
+- Translate theological terms literally
+- Preserve technical precision for creedal statements
+- Use "Allāh" consistently (not "God")
+`;
+
+// Stack with master prompt
+const customPrompt = stackPrompts(getMasterPrompt(), customAddon);
+
+// Use with LLM
+const response = await llm.chat({
+  system: customPrompt,
+  messages: [{
+    role: 'user',
+    content: 'P1: باب الإيمان بالله'
+  }]
+});
+```
+
+## Testing Addon Changes
+
+```typescript
+import { getMasterPrompt, stackPrompts } from 'wobble-bibble';
+
+// Test a new addon before adding it to the library
+const experimentalAddon = `
+## Experimental Rules
+- Test rule 1
+- Test rule 2
+`;
+
+const testPrompt = stackPrompts(getMasterPrompt(), experimentalAddon);
+
+// Run tests with the experimental prompt
+const results = await runTranslationTests(testPrompt);
+```
+
+## Inspecting Master Content
+
+```typescript
+import { getMasterPrompt } from 'wobble-bibble';
+
+const master = getMasterPrompt();
+
+// Check token count for budgeting
+const tokenCount = estimateTokens(master);
+console.log(`Master prompt: ~${tokenCount} tokens`);
+
+// Extract specific sections for analysis
+const hasTranslitRules = master.includes('ALA-LC');
+const hasArabicRestrictions = master.includes('ﷺ');
+```
+
+## Comparison with Other Functions
+
+```typescript
+import { getMasterPrompt, getPrompt, getStackedPrompt } from 'wobble-bibble';
+
+// Get master only (no addon)
+const master = getMasterPrompt();
+
+// Get master through getPrompt
+const masterObj = getPrompt('master_prompt');
+console.log(master === masterObj.content); // true
+
+// Get master through getStackedPrompt
+const masterStacked = getStackedPrompt('master_prompt');
+console.log(master === masterStacked); // true
+
+// All three return the same content, but:
+// - getMasterPrompt() is most explicit about intent
+// - getPrompt('master_prompt') includes metadata
+// - getStackedPrompt('master_prompt') is consistent with other prompts
+```
+
+<Note>
+  The master prompt is the foundation of all wobble-bibble prompts. It contains the core constraints that prevent common LLM errors like Arabic leakage, ID corruption, and formatting issues.
+</Note>
+
+<Warning>
+  When creating custom combinations, always stack the master prompt first, then add your specialized rules. The master prompt establishes critical boundaries that specialized addons build upon.
+</Warning>
+
+## Related
+
+- [stackPrompts](/api/prompts/stack-prompts) - Combine master with custom addons
+- [getPrompt](/api/prompts/get-prompt) - Get a specific prompt (includes master for addons)
+- [getStackedPrompt](/api/prompts/get-stacked-prompt) - Get stacked content by ID

@@ -1,0 +1,480 @@
+---
+title: Validating Output
+description: Detect and handle LLM translation errors with wobble-bibble's validation system
+---
+
+Wobble-bibble includes a comprehensive validation system to catch common LLM translation errors like invented IDs, Arabic script leaks, malformed markers, and structural problems.
+
+## Basic Validation
+
+The `validateTranslationResponse()` function checks an LLM's translation output against your source segments:
+
+```typescript
+import { validateTranslationResponse } from 'wobble-bibble';
+
+const segments = [
+  { id: 'P1', text: 'هذا نص عربي طويل يحتوي على محتوى كافٍ للترجمة' },
+  { id: 'P2', text: 'نص عربي آخر للترجمة' }
+];
+
+const llmOutput = `P1 - This is a sufficiently long English translation.
+P2 - Another Arabic text for translation.`;
+
+const result = validateTranslationResponse(segments, llmOutput);
+
+if (result.errors.length > 0) {
+  console.error('Validation errors found:', result.errors);
+} else {
+  console.log('Translation is valid!');
+}
+```
+
+<Info>
+  Validation only checks segments that appear in the LLM output. If your corpus has 100 segments but the LLM only translated 10, validation only checks those 10.
+</Info>
+
+## Understanding Validation Results
+
+The validation result contains three key properties:
+
+```typescript
+interface ValidationResponseResult {
+  // IDs found in the response (in order)
+  parsedIds: string[];
+  
+  // Normalized version of the response (with formatting fixes)
+  normalizedResponse: string;
+  
+  // Array of validation errors (empty if valid)
+  errors: ValidationError[];
+}
+```
+
+### Validation Error Structure
+
+Each error includes detailed information for debugging:
+
+```typescript
+interface ValidationError {
+  // Machine-readable error type
+  type: ValidationErrorType;
+  
+  // Human-readable error message
+  message: string;
+  
+  // Character range in the original response (end is exclusive)
+  range: { start: number; end: number };
+  
+  // The exact text that caused the error
+  matchText: string;
+  
+  // Segment ID where error occurred (if applicable)
+  id?: string;
+  
+  // Stable rule identifier for tooling
+  ruleId?: string;
+}
+```
+
+## Error Types
+
+Wobble-bibble checks for 13 different error types:
+
+<AccordionGroup>
+  <Accordion title="no_valid_markers - No translation markers found">
+    The response doesn't contain any valid "ID - ..." markers.
+    
+    ```typescript
+    // ❌ Fails validation
+    const segments = [{ id: 'P1', text: 'نص عربي' }];
+    const bad = 'Just some text without markers';
+    const result = validateTranslationResponse(segments, bad);
+    // result.errors[0].type === 'no_valid_markers'
+    ```
+  </Accordion>
+
+  <Accordion title="invalid_marker_format - Malformed segment markers">
+    Marker format doesn't match expected pattern (e.g., wrong ID shape, missing dash, dollar sign).
+    
+    ```typescript
+    // ❌ Invalid marker formats
+    const bad1 = 'B12a34 - Invalid format';  // Bad ID format
+    const bad2 = 'B1234$5 - Invalid';        // Contains $
+    const bad3 = 'P1 -   ';                  // Empty after dash
+    ```
+  </Accordion>
+
+  <Accordion title="invented_id - ID not in source corpus">
+    The response includes a segment ID that doesn't exist in your source segments.
+    
+    ```typescript
+    const segments = [{ id: 'P1', text: 'نعم' }];
+    
+    // ❌ P2 doesn't exist in segments
+    const response = `P1 - Valid.\nP2 - Invented!`;
+    const result = validateTranslationResponse(segments, response);
+    // result.errors[0].type === 'invented_id'
+    ```
+  </Accordion>
+
+  <Accordion title="duplicate_id - Same ID appears multiple times">
+    A segment ID appears more than once in the response.
+    
+    ```typescript
+    const segments = [{ id: 'P1', text: 'نعم' }];
+    
+    // ❌ P1 appears twice
+    const response = `P1 - First.\nP1 - Duplicate!`;
+    const result = validateTranslationResponse(segments, response);
+    // result.errors[0].type === 'duplicate_id'
+    ```
+  </Accordion>
+
+  <Accordion title="missing_id_gap - Skipped segments detected">
+    The response includes P1 and P3 but skips P2 (based on corpus order).
+    
+    ```typescript
+    const segments = [
+      { id: 'P1', text: 'نص' },
+      { id: 'P2', text: 'نص' },
+      { id: 'P3', text: 'نص' }
+    ];
+    
+    // ❌ P2 is missing
+    const response = `P1 - First.\nP3 - Third.`;
+    const result = validateTranslationResponse(segments, response);
+    // result.errors[0].type === 'missing_id_gap'
+    // result.errors[0].message includes "P2"
+    ```
+  </Accordion>
+
+  <Accordion title="arabic_leak - Arabic script detected in output">
+    Arabic characters appear in the translation (except the allowed ﷺ symbol).
+    
+    ```typescript
+    const segments = [{ id: 'P1', text: 'نعم' }];
+    
+    // ❌ Arabic in output
+    const bad = `P1 - He quoted «الله».`;
+    const result = validateTranslationResponse(segments, bad);
+    // result.errors[0].type === 'arabic_leak'
+    // result.errors[0].matchText === 'الله'
+    
+    // ✅ ﷺ is allowed
+    const good = `P1 - Muḥammad ﷺ said...`;
+    const valid = validateTranslationResponse(segments, good);
+    // valid.errors.length === 0
+    ```
+  </Accordion>
+
+  <Accordion title="truncated_segment - Incomplete translation detected">
+    Segment contains only "…", "...", or "[INCOMPLETE]".
+    
+    ```typescript
+    const segments = [
+      { id: 'P1', text: 'نص طويل' },
+      { id: 'P2', text: 'نص آخر' }
+    ];
+    
+    // ❌ Truncated segments
+    const response = `P1 - …\nP2 - [INCOMPLETE]`;
+    const result = validateTranslationResponse(segments, response);
+    // result.errors.length === 2 (both truncated)
+    ```
+  </Accordion>
+
+  <Accordion title="length_mismatch - Translation too short">
+    Translation is suspiciously short compared to the Arabic source (heuristic check).
+    
+    ```typescript
+    const longArabic = 'هو هذا الذي يسمونه بالمضاف المحذوف...';
+    const segments = [{ id: 'P1', text: longArabic }];
+    
+    // ❌ Too short for long Arabic
+    const response = `P1 - Short.`;
+    const result = validateTranslationResponse(segments, response);
+    // result.errors[0].type === 'length_mismatch'
+    ```
+  </Accordion>
+
+  <Accordion title="collapsed_speakers - Speaker labels mid-line">
+    Speaker labels appear in the middle of a line instead of starting a new line.
+    
+    ```typescript
+    const segments = [{
+      id: 'P1',
+      text: 'السائل: نعم\nالشيخ: نعم'
+    }];
+    
+    // ❌ "Questioner:" appears mid-line
+    const bad = `P1 - Questioner: Yes.\nThe Shaykh: Yes. Questioner: No.`;
+    const result = validateTranslationResponse(segments, bad);
+    // result.errors[0].type === 'collapsed_speakers'
+    ```
+  </Accordion>
+
+  <Accordion title="empty_parentheses - Too many () patterns">
+    Excessive "()" patterns detected (often indicates failed transliterations).
+    
+    ```typescript
+    const segments = [{ id: 'P1', text: 'نص' }];
+    
+    // ❌ Too many empty parentheses (threshold is 3)
+    const bad = `P1 - One () two () three () four () five ().`;
+    const result = validateTranslationResponse(segments, bad);
+    // result.errors.length === 5
+    ```
+  </Accordion>
+
+  <Accordion title="all_caps - Excessive ALL CAPS detected">
+    Run of uppercase words detected ("shouting" text).
+    
+    ```typescript
+    const segments = [{ id: 'P1', text: 'نص' }];
+    
+    // ❌ Too many ALL CAPS words in a row
+    const bad = `P1 - THIS IS VERY VERY LOUD.`;
+    const result = validateTranslationResponse(segments, bad);
+    // result.errors[0].type === 'all_caps'
+    
+    // ✅ Acronyms are fine
+    const good = `P1 - The USA is fine.`;
+    ```
+  </Accordion>
+
+  <Accordion title="newline_after_id - Formatting error">
+    Newline appears immediately after "ID -" instead of the translation text.
+    
+    ```typescript
+    const segments = [{ id: 'P1', text: 'نص' }];
+    
+    // ❌ Newline after marker
+    const bad = `P1 -\nText`;
+    const result = validateTranslationResponse(segments, bad);
+    // result.errors[0].type === 'newline_after_id'
+    ```
+  </Accordion>
+
+  <Accordion title="multiword_translit_without_gloss - Missing English gloss">
+    Multi-word transliteration phrase without parenthetical English explanation.
+    
+    ```typescript
+    const segments = [{ id: 'P1', text: 'نص عربي' }];
+    
+    // ❌ No gloss for multi-word phrase
+    const bad = `P1 - He advised al-hajr fi al-madajīʿ.`;
+    const result = validateTranslationResponse(segments, bad);
+    // result.errors[0].type === 'multiword_translit_without_gloss'
+    
+    // ✅ Has gloss
+    const good = `P1 - He advised al-hajr fi al-madajīʿ (marital bed abandonment).`;
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Configuring Validation
+
+You can customize validation behavior with the `config` option:
+
+```typescript
+const result = validateTranslationResponse(segments, response, {
+  config: {
+    // Require at least 4 consecutive ALL CAPS words to flag (default: 5)
+    allCapsWordRunThreshold: 4
+  }
+});
+```
+
+## Custom Validation Rules
+
+You can run only specific validation rules:
+
+```typescript
+import type { ValidationRule, ValidationContext } from 'wobble-bibble';
+
+// Define a custom rule
+const myCustomRule: ValidationRule = {
+  id: 'custom_check',
+  type: 'arabic_leak', // Map to existing type or extend
+  run: (context: ValidationContext) => {
+    const errors = [];
+    // Your custom validation logic
+    return errors;
+  }
+};
+
+const result = validateTranslationResponse(segments, response, {
+  rules: [myCustomRule]
+});
+```
+
+## Handling Validation Errors
+
+### Highlighting Errors in UI
+
+Use the `range` property to highlight errors in your UI:
+
+```typescript
+function highlightErrors(response: string, errors: ValidationError[]) {
+  // Sort errors by start position (descending) to insert markers without offset issues
+  const sorted = [...errors].sort((a, b) => b.range.start - a.range.start);
+  
+  let highlighted = response;
+  for (const error of sorted) {
+    const { start, end } = error.range;
+    const text = response.slice(start, end);
+    highlighted = 
+      highlighted.slice(0, start) + 
+      `<mark title="${error.message}">${text}</mark>` + 
+      highlighted.slice(end);
+  }
+  
+  return highlighted;
+}
+```
+
+### Grouping Errors by Type
+
+```typescript
+import { VALIDATION_ERROR_TYPE_INFO } from 'wobble-bibble';
+
+function groupErrorsByType(errors: ValidationError[]) {
+  const grouped = new Map<ValidationErrorType, ValidationError[]>();
+  
+  for (const error of errors) {
+    const existing = grouped.get(error.type) || [];
+    existing.push(error);
+    grouped.set(error.type, existing);
+  }
+  
+  // Print summary
+  for (const [type, errors] of grouped) {
+    const info = VALIDATION_ERROR_TYPE_INFO[type];
+    console.log(`${type}: ${errors.length} errors`);
+    console.log(`  Description: ${info.description}`);
+  }
+}
+```
+
+### Filtering by Severity
+
+Implement custom severity levels:
+
+```typescript
+type Severity = 'critical' | 'warning' | 'info';
+
+const SEVERITY_MAP: Record<ValidationErrorType, Severity> = {
+  'no_valid_markers': 'critical',
+  'invented_id': 'critical',
+  'duplicate_id': 'critical',
+  'arabic_leak': 'critical',
+  'missing_id_gap': 'warning',
+  'truncated_segment': 'warning',
+  'collapsed_speakers': 'warning',
+  'length_mismatch': 'warning',
+  'all_caps': 'info',
+  'empty_parentheses': 'info',
+  'invalid_marker_format': 'critical',
+  'newline_after_id': 'warning',
+  'multiword_translit_without_gloss': 'info'
+};
+
+function getCriticalErrors(errors: ValidationError[]) {
+  return errors.filter(e => SEVERITY_MAP[e.type] === 'critical');
+}
+```
+
+## Real-World Example
+
+Here's a complete validation workflow:
+
+```typescript
+import { 
+  validateTranslationResponse, 
+  VALIDATION_ERROR_TYPE_INFO,
+  type ValidationError 
+} from 'wobble-bibble';
+
+async function translateAndValidate(
+  segments: Segment[],
+  promptContent: string
+) {
+  // Get LLM translation
+  const llmOutput = await callYourLLM(segments, promptContent);
+  
+  // Validate the output
+  const validation = validateTranslationResponse(segments, llmOutput, {
+    config: { allCapsWordRunThreshold: 5 }
+  });
+  
+  // Handle errors
+  if (validation.errors.length > 0) {
+    console.error(`Found ${validation.errors.length} validation errors:`);
+    
+    // Group by type
+    const byType = new Map<string, ValidationError[]>();
+    for (const error of validation.errors) {
+      const existing = byType.get(error.type) || [];
+      existing.push(error);
+      byType.set(error.type, existing);
+    }
+    
+    // Report each type
+    for (const [type, errors] of byType) {
+      const info = VALIDATION_ERROR_TYPE_INFO[type as ValidationErrorType];
+      console.error(`\n${type} (${errors.length}):`);
+      console.error(`  ${info.description}`);
+      
+      for (const error of errors.slice(0, 3)) { // Show first 3
+        console.error(`  - ${error.message}`);
+        console.error(`    Match: "${error.matchText}"`);
+        if (error.id) {
+          console.error(`    Segment: ${error.id}`);
+        }
+      }
+    }
+    
+    // Return null or throw based on severity
+    const critical = validation.errors.filter(
+      e => SEVERITY_MAP[e.type] === 'critical'
+    );
+    
+    if (critical.length > 0) {
+      throw new Error(`Translation failed with ${critical.length} critical errors`);
+    }
+  }
+  
+  return {
+    translation: llmOutput,
+    validation
+  };
+}
+```
+
+## Getting Error Descriptions
+
+Use `VALIDATION_ERROR_TYPE_INFO` to get human-readable descriptions:
+
+```typescript
+import { VALIDATION_ERROR_TYPE_INFO } from 'wobble-bibble';
+
+// Get description for a specific error type
+const description = VALIDATION_ERROR_TYPE_INFO.arabic_leak.description;
+// "Arabic script was detected in output (except ﷺ)."
+
+// Print all error types and descriptions
+for (const [type, info] of Object.entries(VALIDATION_ERROR_TYPE_INFO)) {
+  console.log(`${type}: ${info.description}`);
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Fixing Errors" icon="wrench" href="/guides/fixing-errors">
+    Learn how to automatically fix common validation errors
+  </Card>
+  <Card title="Validation API" icon="book" href="/api/validation/validate-translation-response">
+    Full API reference for validation functions
+  </Card>
+</CardGroup>

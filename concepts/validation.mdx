@@ -1,0 +1,456 @@
+---
+title: Validation
+description: Understand wobble-bibble's validation system for detecting LLM hallucinations and formatting errors
+---
+
+Wobble-bibble validates LLM translation output against a set of strict rules to catch hallucinations, formatting errors, and Arabic script leaks.
+
+## Overview
+
+The validation system checks translations for:
+
+- **ID integrity**: Invented IDs, duplicates, missing segments
+- **Format compliance**: Marker syntax, line breaks, structure
+- **Script leaks**: Arabic characters in output
+- **Translation quality**: Truncation, length mismatches, empty content
+
+```typescript
+import { validateTranslationResponse } from 'wobble-bibble';
+
+const segments = [
+    { id: 'P1', text: 'نص عربي طويل...' },
+    { id: 'P2', text: 'نص آخر...' }
+];
+
+const response = 'P1 - A complete translation.\nP2 - Another translation.';
+
+const result = validateTranslationResponse(segments, response);
+
+if (result.errors.length > 0) {
+    console.error('Validation failed:', result.errors);
+}
+```
+
+## Validation error types
+
+Wobble-bibble defines 13 error types. Each has a stable ID and human-readable description:
+
+```typescript
+// From src/types.ts:15-28
+export type ValidationErrorType =
+    | 'invalid_marker_format'
+    | 'no_valid_markers'
+    | 'newline_after_id'
+    | 'duplicate_id'
+    | 'invented_id'
+    | 'missing_id_gap'
+    | 'collapsed_speakers'
+    | 'truncated_segment'
+    | 'arabic_leak'
+    | 'empty_parentheses'
+    | 'length_mismatch'
+    | 'all_caps'
+    | 'multiword_translit_without_gloss';
+```
+
+### ID integrity errors
+
+These catch LLM hallucinations where segment IDs are invented, duplicated, or skipped.
+
+<Tabs>
+  <Tab title="invented_id">
+    **Description**: The response contains a segment ID that doesn't exist in the source corpus.
+
+    ```typescript
+    // From src/validation.ts:423-438
+    const validateInventedIds = (context: ValidationContext): ValidationError[] => {
+        const errors: ValidationError[] = [];
+        for (const marker of context.markers) {
+            if (!context.segmentById.has(marker.id)) {
+                errors.push(
+                    makeErrorFromRawRange(
+                        'invented_id',
+                        `Invented ID detected: "${marker.id}" - this ID does not exist in the source`,
+                        marker.headerText,
+                        { end: marker.rawEnd, start: marker.rawStart },
+                        marker.id,
+                    ),
+                );
+            }
+        }
+        return errors;
+    };
+    ```
+
+    **Example failure**:
+    ```
+    Source: P1, P2
+    Output: P1 - Text\nP3 - Invented!
+    Error: invented_id on "P3"
+    ```
+  </Tab>
+
+  <Tab title="duplicate_id">
+    **Description**: The same segment ID appears more than once in the response.
+
+    ```typescript
+    // From src/validation.ts:396-414
+    const validateDuplicateIds = (context: ValidationContext): ValidationError[] => {
+        const seen = new Set<string>();
+        const errors: ValidationError[] = [];
+        for (const marker of context.markers) {
+            if (seen.has(marker.id)) {
+                errors.push(
+                    makeErrorFromRawRange(
+                        'duplicate_id',
+                        `Duplicate ID "${marker.id}" detected - each segment should appear only once`,
+                        marker.headerText,
+                        { end: marker.rawEnd, start: marker.rawStart },
+                        marker.id,
+                    ),
+                );
+            } else {
+                seen.add(marker.id);
+            }
+        }
+        return errors;
+    };
+    ```
+
+    **Example failure**:
+    ```
+    Output: P1 - First\nP1 - Duplicate!
+    Error: duplicate_id on second "P1"
+    ```
+  </Tab>
+
+  <Tab title="missing_id_gap">
+    **Description**: The response includes two IDs whose corpus order implies intermediate IDs are missing.
+
+    ```typescript
+    // From src/validation.ts:490-518
+    const validateMissingIdGaps = (context: ValidationContext): ValidationError[] => {
+        const indexById = buildSegmentIndexById(context.segments);
+        const parsedIdSet = new Set(context.parsedIds);
+        const missing = new Set<string>();
+        const errors: ValidationError[] = [];
+
+        for (let i = 0; i < context.markers.length - 1; i++) {
+            const a = context.markers[i];
+            const b = context.markers[i + 1];
+            const gap = getGapIndices(context, indexById, a.id, b.id);
+            if (!gap) continue;
+            
+            const newlyMissing = collectMissingIds(context, gap.start, gap.end, parsedIdSet, missing);
+            for (const midId of newlyMissing) {
+                errors.push(
+                    makeErrorFromRawRange(
+                        'missing_id_gap',
+                        `Missing segment ID detected between translated IDs: "${midId}"`,
+                        context.rawResponse.slice(b.rawStart, b.rawEnd),
+                        { end: b.rawEnd, start: b.rawStart },
+                        midId,
+                    ),
+                );
+            }
+        }
+        return errors;
+    };
+    ```
+
+    **Example failure**:
+    ```
+    Source: P1, P2, P3
+    Output: P1 - Text\nP3 - Skipped P2!
+    Error: missing_id_gap for "P2"
+    ```
+  </Tab>
+</Tabs>
+
+### Format errors
+
+These catch malformed markers and structural issues.
+
+<Tabs>
+  <Tab title="invalid_marker_format">
+    **Description**: A segment marker line is malformed (wrong ID shape or missing content after dash).
+
+    Validates against the marker pattern:
+    ```typescript
+    // From src/constants.ts:36-38
+    export const MARKER_ID_PATTERN = 
+        `${TRANSLATION_MARKER_PARTS.markers}${TRANSLATION_MARKER_PARTS.digits}${TRANSLATION_MARKER_PARTS.suffix}?`;
+    // Matches: P1234, B45a, T678, etc.
+    ```
+
+    **Example failures**:
+    ```
+    P1234$ - Invalid ($ character)
+    P1234a - Valid
+    P1234 - (empty after dash)
+    ```
+  </Tab>
+
+  <Tab title="newline_after_id">
+    **Description**: The response used `ID -\nText` instead of `ID - Text` (newline immediately after marker).
+
+    **Example failure**:
+    ```
+    P1 -
+    Text on next line
+    ```
+
+    Should be:
+    ```
+    P1 - Text on same line
+    ```
+  </Tab>
+
+  <Tab title="collapsed_speakers">
+    **Description**: Speaker labels appear mid-line instead of starting on a new line.
+
+    ```typescript
+    // From src/validation.ts:751-773
+    const findCollapsedSpeakerLabel = (text: string) => {
+        const lineStartLabels = getLineStartLabelCounts(text).prefixes;
+        if (lineStartLabels.size === 0) return;
+        
+        const detectedLabels = [...lineStartLabels.keys()];
+        const labelPattern = detectedLabels.map((label) => escapeRegExp(label)).join('|');
+        
+        const lines = text.split('\n');
+        let offset = 0;
+        const pattern = new RegExp(`\\b(${labelPattern})\\s*:`, 'g');
+        
+        for (const line of lines) {
+            for (const match of line.matchAll(pattern)) {
+                const idx = match.index ?? 0;
+                if (idx > 0) {  // Label not at line start
+                    return { detectedLabels, index: offset + idx, label: match[1] };
+                }
+            }
+            offset += line.length + 1;
+        }
+    };
+    ```
+
+    **Example failure**:
+    ```
+    P1 - Some text. Questioner: What about...?
+    ```
+
+    Should be:
+    ```
+    P1 - Some text.
+    Questioner: What about...?
+    ```
+  </Tab>
+</Tabs>
+
+### Content errors
+
+These catch translation quality issues and script leaks.
+
+<Tabs>
+  <Tab title="arabic_leak">
+    **Description**: Arabic script detected in output (except ﷺ).
+
+    Uses Unicode ranges for Arabic detection:
+    ```typescript
+    // From src/validation.ts:560
+    const arabicPattern = /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDF9\uFDFB-\uFDFF\uFE70-\uFEFF]+/g;
+    ```
+
+    Covers:
+    - `\u0600-\u06FF` - Arabic block
+    - `\u0750-\u077F` - Arabic Supplement
+    - `\uFB50-\uFDFF` - Arabic Presentation Forms
+    - `\uFE70-\uFEFF` - Arabic Presentation Forms-B
+
+    <Warning>
+    The honorific ﷺ is the only allowed Arabic character. All other Arabic script is forbidden, even in quotes or parentheses.
+    </Warning>
+  </Tab>
+
+  <Tab title="truncated_segment">
+    **Description**: A segment appears truncated (just "…" / "..." / "[INCOMPLETE]").
+
+    ```typescript
+    // From src/validation.ts:527-546
+    const validateTruncatedSegments = (context: ValidationContext): ValidationError[] => {
+        const errors: ValidationError[] = [];
+        for (const marker of context.markers) {
+            const content = context.normalizedResponse
+                .slice(marker.translationStart, marker.translationEnd).trim();
+            const isEllipsis = content === '…' || content === '...';
+            const sourceText = context.segmentById.get(marker.id)?.text ?? '';
+            const sourceIsEllipsisOnly = /^\s*(?:…|\.{3})\s*$/.test(sourceText);
+            
+            if (!content || content === '[INCOMPLETE]' || (isEllipsis && !sourceIsEllipsisOnly)) {
+                errors.push(/* truncated_segment error */);
+            }
+        }
+        return errors;
+    };
+    ```
+  </Tab>
+
+  <Tab title="length_mismatch">
+    **Description**: Translation appears too short relative to Arabic source.
+
+    Uses a heuristic ratio check:
+    ```typescript
+    // From src/constants.ts:41-42
+    export const MIN_ARABIC_LENGTH_FOR_TRUNCATION_CHECK = 50;
+    export const MIN_TRANSLATION_RATIO = 0.25;
+    ```
+
+    Only triggers if:
+    1. Arabic text ≥ 50 characters
+    2. Translation length / Arabic length < 0.25
+
+    **Example**:
+    ```
+    Arabic: 200 characters
+    Translation: 30 characters  
+    Expected: ≥ 50 characters (200 × 0.25)
+    Result: length_mismatch error
+    ```
+  </Tab>
+
+  <Tab title="empty_parentheses">
+    **Description**: Excessive "()" patterns detected, indicating failed term-pairs.
+
+    ```typescript
+    // From src/constants.ts:40
+    export const MAX_EMPTY_PARENTHESES = 3;
+    ```
+
+    **Example failure**:
+    ```
+    Translation: "The () said () to () about ()"
+    Result: 4 empty parentheses > threshold of 3
+    ```
+
+    This usually indicates the LLM omitted transliterated terms or English glosses.
+  </Tab>
+</Tabs>
+
+## Validation result
+
+The validator returns a structured result:
+
+```typescript
+// From src/types.ts:115-117
+export type ValidationResponseResult = { 
+    normalizedResponse: string;  // Cleaned response text
+    parsedIds: string[];         // IDs found in response
+    errors: ValidationError[]    // All validation errors
+};
+```
+
+Each error includes:
+
+```typescript
+// From src/types.ts:63-73
+export type ValidationError = {
+    type: ValidationErrorType;   // Error category
+    message: string;             // Human-readable message
+    range: Range;                // Character offsets (start/end)
+    matchText: string;           // The problematic text
+    id?: string;                 // Associated segment ID
+    ruleId?: string;             // Specific rule identifier
+};
+```
+
+### Error ranges
+
+Each error includes precise character offsets:
+
+```typescript
+// From src/types.ts:31-33
+export type Range = { 
+    start: number;  // Inclusive
+    end: number     // Exclusive
+};
+```
+
+Use ranges to highlight errors in UI:
+
+```typescript
+const result = validateTranslationResponse(segments, response);
+
+for (const error of result.errors) {
+    const snippet = response.slice(error.range.start, error.range.end);
+    console.error(`${error.type} at [${error.range.start}:${error.range.end}]: ${snippet}`);
+}
+```
+
+## Validation configuration
+
+Some rules accept configuration:
+
+```typescript
+// From src/types.ts:81-83
+export type ValidationConfig = {
+    allCapsWordRunThreshold: number;  // Min consecutive caps words
+};
+```
+
+Customize validation:
+
+```typescript
+const result = validateTranslationResponse(
+    segments,
+    response,
+    {
+        config: {
+            allCapsWordRunThreshold: 10  // Default: 5
+        }
+    }
+);
+```
+
+## Error descriptions
+
+All error types have human-readable descriptions:
+
+```typescript
+// From src/validation.ts:27-68
+export const VALIDATION_ERROR_TYPE_INFO = {
+    arabic_leak: {
+        description: 'Arabic script was detected in output (except ﷺ).',
+    },
+    duplicate_id: {
+        description: 'The same segment ID appears more than once in the response.',
+    },
+    invented_id: {
+        description: 'The response contains a segment ID that does not exist in the provided source corpus.',
+    },
+    missing_id_gap: {
+        description: 'A gap was detected: the response includes two IDs whose corpus order implies one or more intermediate IDs are missing.',
+    },
+    // ... etc
+} as const satisfies Record<ValidationErrorType, { description: string }>;
+```
+
+Access descriptions programmatically:
+
+```typescript
+import { VALIDATION_ERROR_TYPE_INFO } from 'wobble-bibble';
+
+const desc = VALIDATION_ERROR_TYPE_INFO.arabic_leak.description;
+console.log(desc);
+// "Arabic script was detected in output (except ﷺ)."
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Prompts" icon="file-lines" href="/concepts/prompts">
+    Understand the prompt system
+  </Card>
+  <Card title="Stacking" icon="layer-group" href="/concepts/stacking">
+    Learn how rules are combined
+  </Card>
+</CardGroup>

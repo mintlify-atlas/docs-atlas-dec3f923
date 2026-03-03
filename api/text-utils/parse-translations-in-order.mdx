@@ -1,0 +1,203 @@
+---
+title: parseTranslationsInOrder
+description: Parse translations into an ordered array preserving original response order and duplicates
+---
+
+## Overview
+
+Parses translation text into an ordered array of ID-translation pairs, preserving the exact order of appearance and keeping duplicate IDs as separate entries. This differs from `parseTranslations` which returns a Map and cannot represent duplicates.
+
+## Function Signature
+
+```typescript
+parseTranslationsInOrder(rawText: string): Array<{
+  id: string;
+  translation: string;
+}>
+```
+
+## Parameters
+
+<ParamField path="rawText" type="string" required>
+  Raw translation text containing translations in the format "ID - Translation text". Does not need to be pre-normalized.
+</ParamField>
+
+## Returns
+
+<ResponseField name="entries" type="Array<{id: string, translation: string}>">
+  Array of objects with `id` and `translation` properties, in the order they appear in the input text. Each entry's translation has the ID prefix removed and whitespace trimmed.
+</ResponseField>
+
+## Usage
+
+### Basic Example
+
+```typescript
+import { parseTranslationsInOrder } from 'wobble-bibble';
+
+const response = `P1 - Allah is the Greatest
+P2 - In the name of Allah
+P3 - The Most Gracious`;
+
+const entries = parseTranslationsInOrder(response);
+
+console.log(entries);
+// [
+//   { id: 'P1', translation: 'Allah is the Greatest' },
+//   { id: 'P2', translation: 'In the name of Allah' },
+//   { id: 'P3', translation: 'The Most Gracious' }
+// ]
+```
+
+### Extracting IDs in Order
+
+```typescript
+const response = `P1 - First
+P2 - Second
+P3 - Third`;
+
+const entries = parseTranslationsInOrder(response);
+const ids = entries.map(e => e.id);
+
+console.log(ids); // ['P1', 'P2', 'P3']
+```
+
+### Preserving Duplicates
+
+```typescript
+// Unlike parseTranslations, this preserves duplicate IDs
+const response = `P1 - First occurrence
+P2 - Middle
+P1 - Second occurrence`;
+
+const entries = parseTranslationsInOrder(response);
+
+console.log(entries.length); // 3
+console.log(entries[0]); // { id: 'P1', translation: 'First occurrence' }
+console.log(entries[2]); // { id: 'P1', translation: 'Second occurrence' }
+```
+
+### Multi-line Translations
+
+```typescript
+const response = `P1 - This translation
+spans multiple lines
+and preserves them all
+P2 - Second translation`;
+
+const entries = parseTranslationsInOrder(response);
+
+console.log(entries[0].translation);
+// 'This translation
+// spans multiple lines
+// and preserves them all'
+```
+
+### Validating Order
+
+```typescript
+const expected = ['P1', 'P2', 'P3'];
+const response = getLLMResponse();
+
+const entries = parseTranslationsInOrder(response);
+const actualIds = entries.map(e => e.id);
+
+const isCorrectOrder = JSON.stringify(actualIds) === JSON.stringify(expected);
+
+if (!isCorrectOrder) {
+  console.error('IDs are out of order!');
+  console.log('Expected:', expected);
+  console.log('Actual:', actualIds);
+}
+```
+
+### Sequential Processing
+
+```typescript
+// Process translations in the exact order they appear
+const entries = parseTranslationsInOrder(response);
+
+for (const { id, translation } of entries) {
+  await saveToDatabase(id, translation);
+  console.log(`Saved ${id}`);
+}
+```
+
+## How It Works
+
+1. **Normalization**: Automatically normalizes the input using `normalizeTranslationText`
+
+2. **Pattern Matching**: Uses regex to find all translation markers (ID followed by dash)
+
+3. **Text Extraction**: For each ID, extracts all text until the next marker or end of string
+
+4. **Prefix Removal**: Removes the "ID - " prefix and trims whitespace from each translation
+
+5. **Order Preservation**: Returns entries in exact appearance order
+
+## Comparison with parseTranslations
+
+| Feature | parseTranslationsInOrder | parseTranslations |
+|---------|-------------------------|-------------------|
+| Return Type | Array | Object with Map |
+| Preserves Order | Yes | No (Map iteration order) |
+| Preserves Duplicates | Yes | No (last wins) |
+| Lookup Performance | O(n) | O(1) |
+| Use Case | Validation, Sequential | Fast lookup |
+
+```typescript
+// Duplicate handling comparison
+const response = `P1 - First
+P1 - Second`;
+
+// parseTranslationsInOrder keeps both
+const ordered = parseTranslationsInOrder(response);
+console.log(ordered.length); // 2
+
+// parseTranslations keeps only last
+const { translationMap } = parseTranslations(response);
+console.log(translationMap.get('P1')); // 'Second'
+```
+
+## When to Use
+
+Use `parseTranslationsInOrder` when:
+
+- **Order matters**: You need to validate or preserve the sequence of translations
+- **Duplicate detection**: You need to detect and handle duplicate IDs
+- **Sequential processing**: You're processing translations one-by-one in order
+- **Validation pipelines**: Building validation logic that checks response structure
+- **Debugging**: Analyzing LLM output issues where order is important
+
+**Don't use** when:
+- You need fast O(1) lookup by ID → use `parseTranslations`
+- You only need the IDs → use `extractTranslationIds`
+- Working with very large datasets where array iteration would be slow
+
+## Best Practices
+
+1. **Validate expected order**:
+   ```typescript
+   const expectedIds = segments.map(s => s.id);
+   const actualIds = parseTranslationsInOrder(response).map(e => e.id);
+   const isValid = JSON.stringify(actualIds) === JSON.stringify(expectedIds);
+   ```
+
+2. **Detect duplicates**:
+   ```typescript
+   const entries = parseTranslationsInOrder(response);
+   const ids = entries.map(e => e.id);
+   const duplicates = ids.filter((id, i) => ids.indexOf(id) !== i);
+   ```
+
+3. **Check for missing IDs**:
+   ```typescript
+   const actualIds = parseTranslationsInOrder(response).map(e => e.id);
+   const missing = expectedIds.filter(id => !actualIds.includes(id));
+   ```
+
+## Related Functions
+
+- [`parseTranslations`](/api/text-utils/parse-translations) - Parse into Map for fast lookup
+- [`extractTranslationIds`](/api/text-utils/extract-translation-ids) - Get only IDs in order
+- [`normalizeTranslationText`](/api/text-utils/normalize-translation-text) - Used internally for normalization

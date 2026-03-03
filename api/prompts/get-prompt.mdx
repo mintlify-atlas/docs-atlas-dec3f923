@@ -1,0 +1,96 @@
+---
+title: getPrompt
+description: Get a specific prompt by ID with stacked content (master + addon combined)
+---
+
+## Function Signature
+
+```typescript
+function getPrompt(id: PromptId): StackedPrompt
+```
+
+Retrieves a specific prompt by its ID. For addon prompts, automatically stacks the master prompt with the specialized addon content. Returns the complete stacked prompt ready for use with an LLM.
+
+## Parameters
+
+<ParamField path="id" type="PromptId" required>
+  The prompt ID to retrieve. Must be one of the available prompt IDs:
+  - `'master_prompt'` - Base prompt for all translations
+  - `'encyclopedia_mixed'` - For mixed-discipline scholarly works
+  - `'fatawa'` - For Islamic legal rulings and Q&A
+  - `'fiqh'` - For Islamic jurisprudence
+  - `'hadith'` - For hadith narrations
+  - `'jarh_wa_tadil'` - For narrator criticism and praise
+  - `'tafsir'` - For Quranic commentary
+  - `'usul_al_fiqh'` - For principles of Islamic jurisprudence
+</ParamField>
+
+## Returns
+
+<ResponseField name="StackedPrompt" type="object">
+  A stacked prompt object ready for LLM use
+  
+  <ResponseField name="id" type="PromptId">
+    Unique identifier matching the requested ID
+  </ResponseField>
+  
+  <ResponseField name="name" type="string">
+    Human-readable display name (e.g., "Hadith", "Fiqh")
+  </ResponseField>
+  
+  <ResponseField name="content" type="string">
+    The full prompt content. For master prompt, returns as-is. For addon prompts, returns master + addon stacked together.
+  </ResponseField>
+  
+  <ResponseField name="isMaster" type="boolean">
+    Whether this is the master prompt (not stacked). `true` only for `'master_prompt'`, `false` for all addons.
+  </ResponseField>
+</ResponseField>
+
+## Example
+
+```typescript
+import { getPrompt } from 'wobble-bibble';
+
+// Get the hadith prompt (automatically stacked with master)
+const hadithPrompt = getPrompt('hadith');
+
+console.log(hadithPrompt);
+// {
+//   id: 'hadith',
+//   name: 'Hadith',
+//   content: '... [master prompt]\n... [hadith addon]',
+//   isMaster: false
+// }
+
+// Use with an LLM
+const response = await llm.chat({
+  system: hadithPrompt.content,
+  messages: [{
+    role: 'user',
+    content: 'P1: قال رسول الله صلى الله عليه وسلم...'
+  }]
+});
+```
+
+## Errors
+
+Throws an `Error` if the prompt ID is not found:
+
+```typescript
+try {
+  const prompt = getPrompt('invalid_id' as PromptId);
+} catch (error) {
+  console.error(error.message); // "Prompt not found: invalid_id"
+}
+```
+
+<Note>
+  The PromptId type is strongly typed based on available prompt files. TypeScript will provide autocomplete and catch invalid IDs at compile time.
+</Note>
+
+## Related
+
+- [getPrompts](/api/prompts/get-prompts) - Get all available prompts
+- [getStackedPrompt](/api/prompts/get-stacked-prompt) - Get just the prompt content string
+- [getMasterPrompt](/api/prompts/get-master-prompt) - Get the master prompt only

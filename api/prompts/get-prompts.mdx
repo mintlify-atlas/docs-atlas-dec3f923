@@ -1,0 +1,121 @@
+---
+title: getPrompts
+description: Get all available prompts as stacked prompts ready for LLM use
+---
+
+## Function Signature
+
+```typescript
+function getPrompts(): StackedPrompt[]
+```
+
+Retrieves all available prompts. The master prompt is returned as-is, while addon prompts are automatically stacked with the master prompt content. Useful for building UI selectors or iterating through all prompt options.
+
+## Parameters
+
+None.
+
+## Returns
+
+<ResponseField name="StackedPrompt[]" type="array">
+  Array of all stacked prompts, sorted with master prompt first, then alphabetically by name
+  
+  <ResponseField name="id" type="PromptId">
+    Unique identifier for the prompt
+  </ResponseField>
+  
+  <ResponseField name="name" type="string">
+    Human-readable display name
+  </ResponseField>
+  
+  <ResponseField name="content" type="string">
+    The full prompt content (master + addon for addon prompts)
+  </ResponseField>
+  
+  <ResponseField name="isMaster" type="boolean">
+    Whether this is the master prompt (not stacked)
+  </ResponseField>
+</ResponseField>
+
+## Example
+
+```typescript
+import { getPrompts } from 'wobble-bibble';
+
+const allPrompts = getPrompts();
+
+console.log(`Found ${allPrompts.length} prompts`);
+// Found 8 prompts
+
+// Build a dropdown selector
+const promptOptions = allPrompts.map(p => ({
+  value: p.id,
+  label: p.name,
+  isMaster: p.isMaster
+}));
+
+console.log(promptOptions);
+// [
+//   { value: 'master_prompt', label: 'Master Prompt', isMaster: true },
+//   { value: 'encyclopedia_mixed', label: 'Encyclopedia Mixed', isMaster: false },
+//   { value: 'fatawa', label: 'Fatawa', isMaster: false },
+//   { value: 'fiqh', label: 'Fiqh', isMaster: false },
+//   { value: 'hadith', label: 'Hadith', isMaster: false },
+//   { value: 'jarh_wa_tadil', label: 'Jarh Wa Tadil', isMaster: false },
+//   { value: 'tafsir', label: 'Tafsir', isMaster: false },
+//   { value: 'usul_al_fiqh', label: 'Usul Al Fiqh', isMaster: false }
+// ]
+```
+
+## Usage with React
+
+```tsx
+import { getPrompts } from 'wobble-bibble';
+import { useState } from 'react';
+
+function PromptSelector() {
+  const prompts = getPrompts();
+  const [selectedId, setSelectedId] = useState('hadith');
+  
+  return (
+    <select 
+      value={selectedId} 
+      onChange={(e) => setSelectedId(e.target.value)}
+    >
+      {prompts.map(p => (
+        <option key={p.id} value={p.id}>
+          {p.name} {p.isMaster && '(Master)'}
+        </option>
+      ))}
+    </select>
+  );
+}
+```
+
+## Filtering Examples
+
+```typescript
+import { getPrompts } from 'wobble-bibble';
+
+const prompts = getPrompts();
+
+// Get only addon prompts (exclude master)
+const addonPrompts = prompts.filter(p => !p.isMaster);
+
+// Get prompts for a specific discipline
+const hadithPrompt = prompts.find(p => p.id === 'hadith');
+
+// Get prompt names for logging
+const promptNames = prompts.map(p => `${p.id}: ${p.name}`);
+console.log(promptNames.join('\n'));
+```
+
+<Note>
+  All addon prompts in the returned array have already been stacked with the master prompt. You can use the `content` field directly with your LLM without additional processing.
+</Note>
+
+## Related
+
+- [getPrompt](/api/prompts/get-prompt) - Get a specific prompt by ID
+- [getPromptIds](/api/prompts/get-prompt-ids) - Get just the prompt IDs
+- [stackPrompts](/api/prompts/stack-prompts) - Manually stack prompts

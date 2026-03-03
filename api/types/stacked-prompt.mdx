@@ -1,0 +1,220 @@
+---
+title: StackedPrompt
+description: A complete prompt ready for use with an LLM, combining master and addon
+---
+
+## Type definition
+
+```typescript
+type StackedPrompt = {
+  id: PromptId;
+  name: string;
+  content: string;
+  isMaster: boolean;
+};
+```
+
+## Properties
+
+<ResponseField name="id" type="PromptId" required>
+  Unique identifier for the prompt. One of:
+  
+  - `'master_prompt'`
+  - `'hadith'`
+  - `'fiqh'`
+  - `'tafsir'`
+  - `'fatawa'`
+  - `'encyclopedia_mixed'`
+  - `'jarh_wa_tadil'`
+  - `'usul_al_fiqh'`
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  Human-readable name for display purposes.
+  
+  Examples:
+  - `"Master Prompt"`
+  - `"Hadith"`
+  - `"Encyclopedia Mixed"`
+</ResponseField>
+
+<ResponseField name="content" type="string" required>
+  The full prompt text, ready to send to an LLM.
+  
+  For addon prompts (non-master), this is automatically the master prompt + addon stacked together.
+  
+  For the master prompt, this is just the base rules.
+</ResponseField>
+
+<ResponseField name="isMaster" type="boolean" required>
+  Whether this is the master prompt (`true`) or a stacked addon (`false`).
+  
+  - `true` for `id: 'master_prompt'`
+  - `false` for all other prompts
+</ResponseField>
+
+## Usage examples
+
+### Get a stacked prompt
+
+```typescript
+import { getPrompt } from 'wobble-bibble';
+
+const hadithPrompt = getPrompt('hadith');
+
+console.log(hadithPrompt.id);        // 'hadith'
+console.log(hadithPrompt.name);      // 'Hadith'
+console.log(hadithPrompt.isMaster);  // false
+console.log(hadithPrompt.content);   // Full stacked prompt text
+```
+
+### Use with OpenAI
+
+```typescript
+import { getPrompt } from 'wobble-bibble';
+import OpenAI from 'openai';
+
+const fiqhPrompt = getPrompt('fiqh');
+const openai = new OpenAI();
+
+const completion = await openai.chat.completions.create({
+  model: 'gpt-4',
+  messages: [
+    {
+      role: 'system',
+      content: fiqhPrompt.content  // Full stacked prompt
+    },
+    {
+      role: 'user',
+      content: 'P1 - باب الطهارة...'
+    }
+  ]
+});
+```
+
+### Use with Anthropic
+
+```typescript
+import { getPrompt } from 'wobble-bibble';
+import Anthropic from '@anthropic-ai/sdk';
+
+const tafsirPrompt = getPrompt('tafsir');
+const anthropic = new Anthropic();
+
+const message = await anthropic.messages.create({
+  model: 'claude-3-5-sonnet-20241022',
+  max_tokens: 4096,
+  system: tafsirPrompt.content,  // Full stacked prompt
+  messages: [
+    {
+      role: 'user',
+      content: 'V2:255 - آية الكرسي...'
+    }
+  ]
+});
+```
+
+### Display in UI dropdown
+
+```typescript
+import { getPrompts } from 'wobble-bibble';
+
+const prompts = getPrompts();
+
+function PromptSelector() {
+  return (
+    <select>
+      {prompts
+        .filter(p => !p.isMaster)  // Exclude master-only
+        .map(prompt => (
+          <option key={prompt.id} value={prompt.id}>
+            {prompt.name}
+          </option>
+        ))}
+    </select>
+  );
+}
+```
+
+### Check if master prompt
+
+```typescript
+import { getPrompt } from 'wobble-bibble';
+
+const masterPrompt = getPrompt('master_prompt');
+console.log(masterPrompt.isMaster);  // true
+
+const hadithPrompt = getPrompt('hadith');
+console.log(hadithPrompt.isMaster);  // false
+```
+
+### Iterate through all prompts
+
+```typescript
+import { getPrompts } from 'wobble-bibble';
+
+const prompts = getPrompts();
+
+for (const prompt of prompts) {
+  console.log(`${prompt.name}:`);
+  console.log(`  ID: ${prompt.id}`);
+  console.log(`  Master: ${prompt.isMaster}`);
+  console.log(`  Length: ${prompt.content.length} chars`);
+}
+```
+
+## Stacking behavior
+
+### Addon prompts (isMaster: false)
+
+When you retrieve an addon prompt like `'hadith'`, the library automatically stacks it:
+
+```typescript
+const hadithPrompt = getPrompt('hadith');
+
+// hadithPrompt.content contains:
+// 1. Full master_prompt.md content
+// 2. Newline separator
+// 3. Full hadith.md addon content
+```
+
+This happens via the `stackPrompts()` function internally:
+
+```typescript
+// Internal implementation
+const content = stackPrompts(MASTER_PROMPT, HADITH_ADDON);
+```
+
+### Master prompt (isMaster: true)
+
+```typescript
+const masterPrompt = getPrompt('master_prompt');
+
+// masterPrompt.content contains:
+// Just the master_prompt.md content
+// No addon stacking
+```
+
+## Type safety
+
+```typescript
+import { getPrompt, type StackedPrompt, type PromptId } from 'wobble-bibble';
+
+// Type-safe prompt ID
+const id: PromptId = 'hadith';  // ✓ Valid
+const invalid: PromptId = 'unknown';  // ✗ Type error
+
+// Type-safe prompt object
+const prompt: StackedPrompt = getPrompt(id);
+```
+
+## Related types
+
+- [PromptId](/api/prompts/get-prompt) - Union type of all valid prompt IDs
+- [PromptMetadata](/api/prompts/get-prompts) - Internal metadata structure
+
+## Related functions
+
+- [getPrompt](/api/prompts/get-prompt) - Returns StackedPrompt by ID
+- [getPrompts](/api/prompts/get-prompts) - Returns array of StackedPrompt
+- [stackPrompts](/api/prompts/stack-prompts) - Manual stacking utility

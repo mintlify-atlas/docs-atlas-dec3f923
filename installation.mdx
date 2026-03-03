@@ -1,0 +1,260 @@
+---
+title: Installation
+description: Install wobble-bibble with npm, yarn, pnpm, or bun
+---
+
+wobble-bibble is available as an npm package and works with all major JavaScript package managers.
+
+## Package managers
+
+<CodeGroup>
+```bash npm
+npm install wobble-bibble
+```
+
+```bash yarn
+yarn add wobble-bibble
+```
+
+```bash pnpm
+pnpm add wobble-bibble
+```
+
+```bash bun
+bun add wobble-bibble
+```
+</CodeGroup>
+
+## Requirements
+
+wobble-bibble requires:
+
+- **Node.js**: >=24.0.0
+- **Bun**: >=1.3.9 (if using Bun runtime)
+
+The library has zero runtime dependencies and is published as an ES module with full TypeScript type definitions.
+
+## Package details
+
+<CardGroup cols={2}>
+  <Card title="Bundle size" icon="box">
+    Lightweight with zero dependencies
+
+    [![Size](https://deno.bundlejs.com/badge?q=wobble-bibble@latest&badge=detailed)](https://bundlejs.com/?q=wobble-bibble%40latest)
+  </Card>
+  <Card title="Type safety" icon="shield">
+    Full TypeScript support with generated type definitions
+  </Card>
+  <Card title="License" icon="scale-balanced">
+    MIT License - free for commercial and personal use
+  </Card>
+  <Card title="npm package" icon="npm">
+    Published as `wobble-bibble` on npm registry
+
+    [![npm version](https://img.shields.io/npm/v/wobble-bibble.svg)](https://www.npmjs.com/package/wobble-bibble)
+  </Card>
+</CardGroup>
+
+## Import syntax
+
+wobble-bibble uses named exports. Import only what you need:
+
+<CodeGroup>
+```typescript Prompt functions
+import {
+  getPrompt,
+  getPrompts,
+  getPromptIds,
+  getMasterPrompt,
+  getStackedPrompt,
+  stackPrompts
+} from 'wobble-bibble';
+```
+
+```typescript Validation
+import {
+  validateTranslationResponse,
+  VALIDATION_ERROR_TYPE_INFO
+} from 'wobble-bibble';
+```
+
+```typescript Text utilities
+import {
+  formatExcerptsForPrompt,
+  normalizeTranslationText,
+  normalizeTranslationTextWithMap,
+  extractTranslationIds,
+  parseTranslations,
+  parseTranslationsInOrder
+} from 'wobble-bibble';
+```
+
+```typescript Fixers
+import {
+  fixCollapsedSpeakerLines,
+  fixAll
+} from 'wobble-bibble';
+```
+
+```typescript Types
+import type {
+  Segment,
+  ValidationError,
+  ValidationErrorType,
+  ValidationResponseResult,
+  ValidationConfig,
+  PromptId,
+  PromptMetadata,
+  StackedPrompt,
+  FixConfig,
+  FixResult
+} from 'wobble-bibble';
+```
+</CodeGroup>
+
+## Verify installation
+
+Create a test file to verify the installation:
+
+```typescript test.ts
+import { getPromptIds, validateTranslationResponse } from 'wobble-bibble';
+
+// List available prompts
+console.log('Available prompts:', getPromptIds());
+
+// Test validation
+const segments = [{ id: 'P1', text: 'نص عربي للاختبار' }];
+const response = 'P1 - Arabic text for testing';
+const result = validateTranslationResponse(segments, response);
+
+console.log('Validation passed:', result.errors.length === 0);
+```
+
+Run with your package manager:
+
+<CodeGroup>
+```bash Node.js
+node test.ts
+```
+
+```bash Bun
+bun test.ts
+```
+
+```bash tsx (TypeScript)
+npx tsx test.ts
+```
+</CodeGroup>
+
+Expected output:
+
+```
+Available prompts: [
+  'master_prompt',
+  'hadith',
+  'fiqh',
+  'tafsir',
+  'fatawa',
+  'encyclopedia_mixed',
+  'jarh_wa_tadil',
+  'usul_al_fiqh'
+]
+Validation passed: true
+```
+
+## Module format
+
+The package is published as an ES module with the following exports:
+
+```json package.json
+{
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  }
+}
+```
+
+<Note>
+The package uses `"sideEffects": false` in package.json, enabling optimal tree-shaking in bundlers like webpack, Rollup, and esbuild.
+</Note>
+
+## Development setup
+
+If you want to contribute to wobble-bibble or run it from source:
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/ragaeeb/wobble-bibble.git
+    cd wobble-bibble
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    The project uses Bun as the package manager:
+
+    ```bash
+    bun install
+    ```
+  </Step>
+
+  <Step title="Generate prompts">
+    Prompts are stored as Markdown files and must be generated into TypeScript:
+
+    ```bash
+    bun run generate
+    ```
+
+    This reads `prompts/*.md` and creates `.generated/prompts.ts`.
+  </Step>
+
+  <Step title="Build the library">
+    Build the TypeScript source to the `dist/` directory:
+
+    ```bash
+    bun run build
+    ```
+
+    This runs TypeScript type checking and bundles with tsdown.
+  </Step>
+
+  <Step title="Run tests">
+    Run the test suite:
+
+    ```bash
+    bun test
+    ```
+
+    Or test the production build:
+
+    ```bash
+    bun run test:dist
+    ```
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Quickstart"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Get started with prompts and validation in 5 minutes
+  </Card>
+  <Card
+    title="API reference"
+    icon="book"
+    href="/api-reference"
+  >
+    Explore all available functions and types
+  </Card>
+</CardGroup>

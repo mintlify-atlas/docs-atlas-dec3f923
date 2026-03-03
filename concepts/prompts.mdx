@@ -1,0 +1,197 @@
+---
+title: Prompt system
+description: Learn how wobble-bibble's master prompt and addons work together to translate Islamic scholarly texts
+---
+
+Wobble-bibble uses a **prompt stacking** system where a universal master prompt is combined with specialized addons to handle different genres of Islamic texts.
+
+## Master prompt
+
+The master prompt (`prompts/master_prompt.md`) contains the core translation rules that apply to all texts:
+
+- **Script lock**: Forbids Arabic script in output (except ﷺ)
+- **Transliteration standards**: ALA-LC with diacritics (ā ī ū ḥ ṣ ḍ ṭ ẓ ʿ ʾ)
+- **ID integrity**: Preserves segment markers exactly
+- **Output format**: Plain text only (no Markdown)
+- **Term definitions**: Technical terms must follow `translit (English)` pattern
+
+<Note>
+The master prompt acts as the "grounding" layer. Every specialized addon is stacked on top of it.
+</Note>
+
+### Core constraints
+
+The master prompt enforces eight critical negations:
+
+1. **NO SANITIZATION** - Preserve polemical terms literally
+2. **NO META-TALK** - Output translation only
+3. **NO MARKDOWN** - Plain text format
+4. **NO EMENDATION** - Don't fix typos in source
+5. **NO INFERENCE** - Don't guess missing text
+6. **NO RESTRUCTURING** - Preserve source structure
+7. **NO OPAQUE TRANSLITERATION** - Translate phrases
+8. **NO INVENTED SEGMENTS** - Never create new IDs
+
+### Arabic leak prevention
+
+The master prompt's highest-priority rule is preventing Arabic script from appearing in output:
+
+```typescript
+// Example from validation.ts:559-596
+const validateArabicLeak = (context: ValidationContext): ValidationError[] => {
+    const arabicPattern = /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDF9\uFDFB-\uFDFF\uFE70-\uFEFF]+/g;
+    const errors: ValidationError[] = [];
+
+    for (const marker of context.markers) {
+        const text = context.normalizedResponse.slice(marker.translationStart, marker.translationEnd);
+        let longestMatch: RegExpMatchArray | undefined;
+        for (const match of text.matchAll(arabicPattern)) {
+            const matchText = match[0].replace(/ﷺ/g, '').trim();
+            if (!matchText) {
+                continue; // ﷺ is allowed
+            }
+            // ... error reporting
+        }
+    }
+};
+```
+
+### Locked formulae
+
+Certain Islamic phrases are "locked" and must appear in transliteration without translation:
+
+| Arabic | Locked output | Forbidden |
+|--------|--------------|----------|
+| السلام عليكم | al-salāmu ʿalaykum | "peace be upon you" |
+| إن شاء الله | in shāʾ Allah | "God willing" |
+| سبحان الله | subḥān Allah | "glory be to God" |
+| الحمد لله | al-ḥamdu li-Allah | "praise be to God" |
+| الله أكبر | Allahu akbar | "Allah is Greatest" |
+
+<Warning>
+These formulae are the only multi-word transliterations allowed without an English gloss. All other multi-word transliterations must be followed by `(English translation)`.
+</Warning>
+
+## Addon prompts
+
+Addons are specialized rule sets for different genres of Islamic texts. Each addon is stacked on top of the master prompt.
+
+### Available addons
+
+Wobble-bibble includes addons for:
+
+- **hadith.md** - Ḥadīth narration chains (isnād)
+- **fiqh.md** - Legal rulings and jurisprudence
+- **tafsir.md** - Qurʾānic commentary
+- **fatawa.md** - Legal verdicts and Q&A
+- **encyclopedia_mixed.md** - Mixed-genre encyclopedic works
+- **jarh_wa_tadil.md** - Narrator criticism and praise
+- **usul_al_fiqh.md** - Legal theory and principles
+
+### Example: Hadith addon
+
+The hadith addon (`prompts/hadith.md`) adds transmission-specific rules:
+
+```markdown
+ISNAD VERBS: Haddathana=Narrated to us; Akhbarana=Informed us; 
+             An=From; Sami'tu=I heard
+CHAIN MARKERS: H(Tahwil)=Switch to new chain; Mursal/Munqati=Broken chain
+JARH/TA'DIL: If narrator-evaluation terms appear, output as translit (English)
+RUMUZ/CODES: Preserve book codes (kh/m/d/t/s/q/4) exactly
+```
+
+### Example: Fiqh addon
+
+The fiqh addon (`prompts/fiqh.md`) adds legal terminology rules:
+
+```markdown
+FIQH/USUL TERMS: Output as translit (English):
+  - wājib (obligatory)
+  - mandūb/mustaḥabb (recommended)
+  - mubāḥ (permissible)
+  - makrūh (disliked)
+  - ḥarām (prohibited)
+  - ṣaḥīḥ (valid)
+  - bāṭil/fāsid (invalid/void)
+```
+
+## Accessing prompts
+
+The library provides a typed API for accessing stacked prompts:
+
+```typescript
+import { getPrompt, getPrompts, getStackedPrompt } from 'wobble-bibble';
+
+// Get a specific stacked prompt
+const hadithPrompt = getPrompt('hadith');
+console.log(hadithPrompt.content); // master + hadith addon
+
+// Get all prompts
+const allPrompts = getPrompts();
+allPrompts.forEach(p => {
+    console.log(`${p.id}: ${p.isMaster ? 'Master' : 'Stacked'}`);
+});
+
+// Get just the prompt text
+const fiqhText = getStackedPrompt('fiqh');
+```
+
+### Prompt metadata
+
+Each prompt includes metadata:
+
+```typescript
+type StackedPrompt = {
+    id: PromptId;              // 'master_prompt' | 'hadith' | 'fiqh' ...
+    name: string;              // Human-readable name
+    content: string;           // Full stacked content
+    isMaster: boolean;         // true only for master_prompt
+};
+```
+
+## How stacking works
+
+Prompts are stacked at runtime using a simple concatenation:
+
+```typescript
+// From src/prompts.ts:26-34
+export const stackPrompts = (master: string, addon: string): string => {
+    if (!master) {
+        return addon;
+    }
+    if (!addon) {
+        return master;
+    }
+    return `${master}\n${addon}`;
+};
+```
+
+<Info>
+The master prompt always comes first, followed by the addon. This ensures base rules are loaded before specialized overrides.
+</Info>
+
+For more details on how stacking resolves conflicts, see [Stacking](/concepts/stacking).
+
+## Prompt generation
+
+Prompts are bundled at build time:
+
+1. Prompt files are stored as Markdown in `prompts/`
+2. `bun run generate` reads all `.md` files
+3. Generates TypeScript definitions in `.generated/prompts.ts`
+4. The generated file is git-ignored
+
+<Note>
+This keeps the source tree clean and separates content from code. The `.generated/` directory is created during `npm run build`.
+</Note>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Validation" icon="check" href="/concepts/validation">
+    Learn how output is validated against rules
+  </Card>
+  <Card title="Stacking" icon="layer-group" href="/concepts/stacking">
+    Understand how master and addon rules interact
+  </Card>
+</CardGroup>

@@ -1,0 +1,99 @@
+---
+title: Segment
+description: A single Arabic source segment identified by an ID
+---
+
+## Type definition
+
+```typescript
+type Segment = {
+  id: string;
+  text: string;
+};
+```
+
+## Properties
+
+<ResponseField name="id" type="string" required>
+  Unique identifier for the segment. Typically follows patterns like `P1234`, `B567a`, `H890` depending on the source corpus.
+</ResponseField>
+
+<ResponseField name="text" type="string" required>
+  The Arabic text content of the segment. Can include Arabic script, diacritics, and punctuation.
+</ResponseField>
+
+## Usage
+
+The `Segment` type is the fundamental input unit for wobble-bibble. It represents a single piece of Arabic text that needs translation.
+
+### Creating segments
+
+```typescript
+import type { Segment } from 'wobble-bibble';
+
+const segments: Segment[] = [
+  {
+    id: 'P1234',
+    text: 'قال رسول الله صلى الله عليه وسلم: إنما الأعمال بالنيات'
+  },
+  {
+    id: 'P1235',
+    text: 'وإنما لكل امرئ ما نوى'
+  }
+];
+```
+
+### With validation
+
+```typescript
+import { validateTranslationResponse, type Segment } from 'wobble-bibble';
+
+const segments: Segment[] = [
+  { id: 'P1', text: 'نص عربي...' },
+  { id: 'P2', text: 'نص آخر...' }
+];
+
+const llmResponse = `P1 - Arabic text...
+P2 - Another text...`;
+
+const result = validateTranslationResponse(segments, llmResponse);
+```
+
+### With prompt formatting
+
+```typescript
+import { formatExcerptsForPrompt, getPrompt, type Segment } from 'wobble-bibble';
+
+const segments: Segment[] = [
+  { id: 'H123', text: 'حدثنا محمد بن يوسف...' }
+];
+
+const hadithPrompt = getPrompt('hadith');
+const formatted = formatExcerptsForPrompt(segments, hadithPrompt.content);
+```
+
+## Segment ID patterns
+
+Common ID prefixes used in Islamic texts:
+
+| Prefix | Source Type | Example |
+|--------|-------------|----------|
+| `P` | General paragraph | `P1234` |
+| `H` | Hadith | `H567` |
+| `B` | Book section | `B890a` |
+| `V` | Verse reference | `V2:255` |
+| `F` | Fatwa | `F123` |
+
+<Note>
+Segment IDs must remain consistent between input and output. The validator checks for invented IDs, duplicates, and missing gaps.
+</Note>
+
+## Related types
+
+- [ValidationError](/api/types/validation-error) - Includes optional `id` field linking errors to segments
+- [ValidationResponseResult](/api/validation/validate-translation-response) - Uses `Segment[]` as input
+
+## Related functions
+
+- [formatExcerptsForPrompt](/api/text-utils/format-excerpts-for-prompt) - Formats segments for LLM input
+- [validateTranslationResponse](/api/validation/validate-translation-response) - Validates translations against segments

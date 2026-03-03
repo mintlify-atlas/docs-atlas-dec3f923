@@ -1,0 +1,160 @@
+---
+title: 'fixAll'
+description: 'Apply multiple fixers to LLM translation output in sequence'
+---
+
+Apply all requested fixers by type, processing them in order and accumulating fixes. Each fixer receives the output of the previous fixer, allowing multiple corrections to be applied in a single pass.
+
+## Function Signature
+
+```typescript
+fixAll(text: string, options: FixAllOptions): FixResult
+```
+
+## Parameters
+
+<ParamField path="text" type="string" required>
+  The translation text to fix. Typically the raw LLM output containing formatting errors.
+</ParamField>
+
+<ParamField path="options" type="FixAllOptions" required>
+  Configuration object specifying which fixers to apply.
+  
+  <Expandable title="FixAllOptions">
+    <ParamField path="types" type="ValidationErrorType[]" required>
+      Array of error types to fix. Each type maps to a specific fixer function.
+      
+      Currently supported types:
+      - `collapsed_speakers` - Fixes speaker lines that were incorrectly merged onto the same line
+      
+      Unsupported types will be tracked in the `skipped` array of the result.
+    </ParamField>
+    
+    <ParamField path="config" type="FixConfig">
+      Optional configuration passed to individual fixers.
+      
+      <Expandable title="FixConfig">
+        <ParamField path="speakerLabels" type="string[]">
+          Speaker labels to recognize when fixing collapsed speaker lines.
+          
+          If not provided, labels will be inferred automatically from the text.
+          
+          Example: `["Questioner", "The Shaykh", "Mu'adhdhin"]`
+        </ParamField>
+        
+        <ParamField path="leadingPunctuation" type="string[]">
+          Punctuation tokens that may appear before a collapsed speaker label.
+          
+          Used to detect patterns like `"... The Shaykh:"` and preserve punctuation when inserting newlines.
+          
+          Default: `['.', '?', '!', '…', '،', '؛', ':', '：', '-', '–', '—']`
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Return Value
+
+<ResponseField name="FixResult" type="object">
+  Object containing the fixed text and metadata about what was applied.
+  
+  <Expandable title="Properties">
+    <ResponseField name="text" type="string">
+      The corrected text after all fixers have been applied.
+    </ResponseField>
+    
+    <ResponseField name="applied" type="string[]">
+      Array of error type strings that were successfully applied (in order).
+      
+      Each entry corresponds to a fixer that ran and found at least one fix to apply.
+    </ResponseField>
+    
+    <ResponseField name="requested" type="string[]">
+      Array of all error types that were requested (copy of `options.types`).
+    </ResponseField>
+    
+    <ResponseField name="skipped" type="string[]">
+      Array of requested error types that could not be applied because no fixer exists for that type.
+    </ResponseField>
+    
+    <ResponseField name="counts" type="Record<string, number>">
+      Object mapping fixer function names to the number of fixes they applied.
+      
+      Example: `{ fixCollapsedSpeakerLines: 3 }`
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example
+
+```typescript
+import { fixAll } from 'wobble-bibble';
+
+const malformedText = `P1 - Questioner: What is the ruling? The Shaykh: The ruling is permissible.
+P2 - The text continues here. Questioner: Another question?`;
+
+const result = fixAll(malformedText, {
+  types: ['collapsed_speakers'],
+  config: {
+    speakerLabels: ['Questioner', 'The Shaykh']
+  }
+});
+
+console.log(result.text);
+// P1 - Questioner: What is the ruling?
+// The Shaykh: The ruling is permissible.
+// P2 - The text continues here.
+// Questioner: Another question?
+
+console.log(result.applied);
+// ['collapsed_speakers']
+
+console.log(result.counts);
+// { fixCollapsedSpeakerLines: 2 }
+```
+
+## Behavior
+
+### Sequential Processing
+
+Fixers are applied in the order specified in `options.types`. Each fixer receives the output of the previous fixer:
+
+```typescript
+const result = fixAll(text, {
+  types: ['collapsed_speakers', 'other_future_fixer']
+});
+// 1. collapsed_speakers fixer runs on original text
+// 2. other_future_fixer runs on output from step 1
+// 3. Final result contains accumulated fixes
+```
+
+### Skipped Fixers
+
+If a requested error type has no corresponding fixer, it will be added to the `skipped` array:
+
+```typescript
+const result = fixAll(text, {
+  types: ['collapsed_speakers', 'nonexistent_type']
+});
+
+console.log(result.skipped);
+// ['nonexistent_type']
+```
+
+### Count Accumulation
+
+The `counts` object tracks how many fixes each fixer applied, using the function name as the key:
+
+```typescript
+const result = fixAll(text, { types: ['collapsed_speakers'] });
+
+// If fixCollapsedSpeakerLines found and fixed 5 instances:
+console.log(result.counts);
+// { fixCollapsedSpeakerLines: 5 }
+```
+
+## Related
+
+- [fixCollapsedSpeakerLines](/api/fixers/fix-collapsed-speaker-lines) - Individual fixer for collapsed speaker lines
+- [VALIDATION_ERROR_TYPE_INFO](/api/validation/validation-error-type-info) - All available error types
